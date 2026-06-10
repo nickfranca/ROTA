@@ -1,118 +1,235 @@
-# Mobilidade ETL com Containers
+# Dados de acidentes da PRF
 
-Projeto acadêmico em Python para processar dados de mobilidade urbana usando Docker, MySQL e paralelismo simples.
+Este projeto baixa os dados anuais de acidentes disponibilizados no portal de
+dados abertos da Polícia Rodoviária Federal (PRF).
+Site: [text](https://www.gov.br/prf/pt-br/acesso-a-informacao/dados-abertos/dados-abertos-da-prf)
 
-A solução simula um pipeline ETL inspirado no processamento de dados públicos de trânsito e transporte. O arquivo CSV bruto é lido, tratado, processado de forma sequencial e paralela, e os resultados são gravados em arquivos CSV e no banco MySQL.
+Para cada ano solicitado, o script baixa e extrai três arquivos:
 
-## Objetivo
+- acidentes agrupados por ocorrência;
+- acidentes agrupados por pessoa;
+- acidentes agrupados por pessoa, incluindo todas as causas e tipos de
+  acidentes.
 
-Organizar dados brutos de transporte público ou trânsito, removendo inconsistências e gerando estatísticas básicas para apoiar análises de mobilidade urbana.
+Os arquivos ZIP são temporários. Depois da extração, somente os CSVs são
+mantidos.
 
-## Arquitetura
+## Criar o ambiente virtual
 
-```text
-data/input/*.csv
-       |
-       v
-Container Python
-ETL sequencial e paralelo
-       |
-       v
-data/output/*.csv
-       |
-       v
-Container MySQL
-dados tratados e estatísticas
-```
-
-## Tecnologias
-
-- Python 3.12
-- Pandas
-- MySQL
-- Docker
-- Docker Compose
-
-## Estrutura
-
-```text
-mobilidade-etl-containers/
-├── app/
-│   ├── config.py
-│   ├── db.py
-│   ├── etl.py
-│   └── main.py
-├── data/
-│   ├── input/
-│   │   └── viagens_exemplo.csv
-│   └── output/
-├── db/
-│   └── init.sql
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-└── README.md
-```
-
-## Como Executar com Docker
+Na raiz do projeto, crie o `.venv`:
 
 ```bash
-docker compose up --build
+python3 -m venv .venv
 ```
 
-O serviço `app` aguarda o MySQL iniciar, processa os dados e grava os resultados.
-
-## Como Executar Localmente
+Ative o ambiente:
 
 ```bash
-python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-python -m app.main --input data/input/viagens_exemplo.csv
 ```
 
-Para salvar no MySQL local, configure as variáveis de ambiente:
+No Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Atualize o `pip` e instale as dependências:
 
 ```bash
-export DB_HOST=localhost
-export DB_PORT=3306
-export DB_NAME=mobilidade
-export DB_USER=mobilidade_user
-export DB_PASSWORD=mobilidade_pass
-python -m app.main --input data/input/viagens_exemplo.csv
+python -m pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-## Colunas Esperadas no CSV
+O ambiente precisa ser criado somente uma vez. Nas execuções seguintes, basta
+ativá-lo antes de rodar o script.
 
-O pipeline espera um CSV com as seguintes colunas:
+## Baixar os dados
 
-- `linha`
-- `data`
-- `horario_previsto`
-- `horario_realizado`
-- `passageiros`
-- `status`
+Baixar um ano:
 
-## Estatísticas Geradas
+```bash
+python prf_scraper.py 2025
+```
 
-- total de viagens por linha;
-- total de passageiros por linha;
-- média de atraso por linha;
-- percentual de viagens atrasadas;
-- comparação de tempo entre processamento sequencial e paralelo.
+Baixar vários anos:
 
-## Paralelismo
+```bash
+python prf_scraper.py 2024 2025 2026
+```
 
-O processamento paralelo divide o DataFrame em blocos e processa cada bloco usando `ProcessPoolExecutor`.
+Se um CSV já existir, ele será substituído somente após o novo arquivo ser
+baixado e extraído corretamente.
 
-Isso permite comparar:
+## Organização dos arquivos
 
-- processamento sequencial: arquivo inteiro em uma única etapa;
-- processamento paralelo: arquivo dividido em partes processadas simultaneamente.
+Por padrão, cada ano é armazenado em uma pasta própria:
 
-## Próximas Evoluções
+```text
+data/
+├── 2024/
+│   ├── ocorrencias.csv
+│   ├── pessoas.csv
+│   └── pessoas_todas_causas.csv
+├── 2025/
+│   ├── ocorrencias.csv
+│   ├── pessoas.csv
+│   └── pessoas_todas_causas.csv
+└── 2026/
+    ├── ocorrencias.csv
+    ├── pessoas.csv
+    └── pessoas_todas_causas.csv
+```
 
-- integrar coleta real via API ou scraping do portal de Acesso à Informação de Palmas;
-- adicionar interface web em Laravel ou outro frontend;
-- incluir gráficos e filtros por linha, data e status;
-- adicionar testes automatizados.
+Os CSVs usam `;` como separador e são publicados pela PRF com codificação
+ISO-8859-1.
+
+### `ocorrencias.csv`
+
+Possui uma linha por acidente. Contém informações gerais como:
+
+- data e horário;
+- UF, município, BR e quilômetro;
+- causa e tipo principal do acidente;
+- condição meteorológica e tipo de pista;
+- totais de pessoas, veículos, feridos e mortos;
+- latitude e longitude.
+
+O campo `id` identifica o acidente e não se repete neste arquivo.
+
+### `pessoas.csv`
+
+Possui os dados das pessoas e dos veículos envolvidos:
+
+- `pesid`: identificação da pessoa;
+- `id_veiculo`: identificação do veículo;
+- idade, sexo e tipo de envolvido;
+- estado físico;
+- tipo, marca e ano do veículo;
+- causa principal e tipo principal do acidente.
+
+Um mesmo `id` aparece várias vezes porque um acidente pode envolver diversas
+pessoas e veículos.
+
+Algumas linhas representam somente veículos. Nelas, `pesid` pode ser igual a
+`0` e os campos da pessoa ficam como `NA`.
+
+### `pessoas_todas_causas.csv`
+
+É uma versão expandida de `pessoas.csv`. Cada pessoa ou veículo é repetido para
+todas as combinações de causas e tipos registradas no acidente.
+
+Os campos adicionais mais importantes são:
+
+- `causa_principal`: informa se aquela causa é a principal;
+- `causa_acidente`: causa registrada;
+- `ordem_tipo_acidente`: posição do tipo na sequência do acidente;
+- `tipo_acidente`: tipo ou evento ocorrido.
+
+O conteúdo de `pessoas.csv` corresponde ao recorte de
+`pessoas_todas_causas.csv` em que:
+
+```text
+causa_principal = "Sim"
+ordem_tipo_acidente = 1
+```
+
+## Sugestão de conexão de dados
+
+### Ocorrências com pessoas
+
+A conexão principal é feita pelo campo `id`:
+
+```sql
+SELECT *
+FROM ocorrencias AS o
+JOIN pessoas AS p
+    ON o.id = p.id;
+```
+
+Essa relação é de um para muitos: uma ocorrência pode possuir várias pessoas e
+veículos.
+
+### Ocorrências com todas as causas
+
+Também é possível conectar diretamente pelo `id`:
+
+```sql
+SELECT *
+FROM ocorrencias AS o
+JOIN pessoas_todas_causas AS ptc
+    ON o.id = ptc.id;
+```
+
+Use esse formato para estudar causas secundárias ou a sequência de tipos do
+acidente.
+
+### Pessoas com todas as causas
+
+Para pessoas identificadas, use `id` e `pesid`:
+
+```sql
+SELECT *
+FROM pessoas AS p
+JOIN pessoas_todas_causas AS ptc
+    ON p.id = ptc.id
+   AND p.pesid = ptc.pesid
+WHERE p.pesid <> 0;
+```
+
+Para linhas que representam apenas veículos, use `id` e `id_veiculo`:
+
+```sql
+SELECT *
+FROM pessoas AS p
+JOIN pessoas_todas_causas AS ptc
+    ON p.id = ptc.id
+   AND p.id_veiculo = ptc.id_veiculo
+WHERE p.pesid = 0;
+```
+
+Na maioria das análises, não é necessário conectar `pessoas.csv` com
+`pessoas_todas_causas.csv`. Escolha um deles:
+
+- use `pessoas.csv` para análises gerais com a causa e o tipo principais;
+- use `pessoas_todas_causas.csv` quando causas secundárias ou múltiplos tipos
+  forem necessários.
+
+## Evitar contagens duplicadas
+
+Após um `JOIN`, os valores gerais da ocorrência serão repetidos para cada
+pessoa, causa e tipo. Por isso, não use `COUNT(*)` para contar acidentes.
+
+Para contar acidentes:
+
+```sql
+COUNT(DISTINCT id)
+```
+
+Para contar pessoas identificadas:
+
+```sql
+COUNT(DISTINCT CONCAT(id, '-', pesid))
+```
+
+Para contar veículos:
+
+```sql
+COUNT(DISTINCT CONCAT(id, '-', id_veiculo))
+```
+
+Totais consolidados, como mortos e feridos por ocorrência, devem ser somados
+diretamente a partir de `ocorrencias.csv` ou depois de reduzir o resultado do
+`JOIN` para uma linha por `id`.
+
+## Modelo recomendado
+
+```text
+ocorrencias.id
+    ├── pessoas.id
+    └── pessoas_todas_causas.id
+```
+
+Use `ocorrencias.csv` como tabela principal de acidentes e escolha
+`pessoas.csv` ou `pessoas_todas_causas.csv` como tabela detalhada, conforme a
+pergunta que será respondida.

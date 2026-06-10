@@ -1,8 +1,4 @@
+data/
+.venv/
 __pycache__/
 *.py[cod]
-.venv/
-.env
-data/output/*.csv
-!data/output/.gitkeep
-mysql_data/
-.DS_Store
