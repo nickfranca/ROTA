@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Observatorio interativo de acidentes em rodovias federais brasileiras."
+    />
+    <title>ROTA | Observatório de segurança viária</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#inicio" aria-label="ROTA, página inicial">
+        <span class="brand-mark">
+          <span></span><span></span><span></span>
+        </span>
+        <span>ROTA</span>
+      </a>
+
+      <nav class="desktop-nav" aria-label="Navegação principal">
+        <a href="#contexto">Projeto</a>
+        <a href="#panorama">Resultados</a>
+        <a href="#metodologia">Arquitetura</a>
+        <a href="#ecossistema">Desempenho</a>
+      </nav>
+
+      <a class="button button-small button-outline" href="#contexto">
+        Iniciar apresentação
+        <span aria-hidden="true">↓</span>
+      </a>
+    </header>
+
+    <main>
+      <section class="hero section presentation-slide" id="inicio" data-title="Abertura">
+        <div class="hero-copy">
+          <div class="eyebrow">
+            <span class="live-dot"></span>
+            Projeto acadêmico · Engenharia de dados
+          </div>
+          <h1>
+            ROTA
+            <span>Dados que ajudam a compreender as rodovias.</span>
+          </h1>
+          <p class="hero-description">
+            Uma solução containerizada para coletar, tratar, analisar e
+            monitorar dados públicos de acidentes da Polícia Rodoviária Federal.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#contexto">
+              Começar apresentação
+              <span aria-hidden="true">↓</span>
+            </a>
+            <a class="text-link" href="#panorama">
+              Ir direto aos resultados
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <div class="hero-footnote">
+            <span>Fonte oficial</span>
+            <strong>PRF · Dados Abertos</strong>
+            <span class="separator"></span>
+            <span id="period-label">2024 — 2026</span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-label="Visualização abstrata de rodovias">
+          <div class="map-card">
+            <div class="map-grid"></div>
+            <svg class="road-map" viewBox="0 0 620 620" role="img">
+              <defs>
+                <linearGradient id="roadGlow" x1="0" x2="1">
+                  <stop offset="0" stop-color="#8b7cff" stop-opacity=".08" />
+                  <stop offset=".5" stop-color="#b5abff" stop-opacity=".9" />
+                  <stop offset="1" stop-color="#67d9e8" stop-opacity=".15" />
+                </linearGradient>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+                  <feMerge>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <g class="roads">
+                <path d="M-30 510 C90 430 125 340 240 300 S380 160 650 90" />
+                <path d="M70 650 C120 510 200 480 250 380 S350 260 470 -30" />
+                <path d="M-30 170 C130 220 190 190 270 230 S400 340 650 320" />
+                <path d="M30 -20 C110 80 130 170 220 210 S390 180 650 210" />
+                <path d="M-40 410 C80 390 160 440 240 450 S420 430 650 510" />
+                <path d="M390 650 C400 530 360 470 410 390 S560 280 650 260" />
+              </g>
+              <g class="nodes" filter="url(#glow)">
+                <circle cx="237" cy="302" r="7" />
+                <circle cx="414" cy="198" r="5" />
+                <circle cx="269" cy="232" r="5" />
+                <circle cx="406" cy="388" r="6" />
+                <circle cx="129" cy="433" r="4" />
+              </g>
+            </svg>
+            <div class="visual-label label-one">
+              <span>Base consolidada</span>
+              <strong id="map-total">169 mil</strong>
+              <small>ocorrências analisadas</small>
+            </div>
+            <div class="visual-label label-two">
+              <span>Atualização</span>
+              <strong id="map-update">abr. 2026</strong>
+              <small>último registro</small>
+            </div>
+            <div class="map-caption">
+              <span class="caption-line"></span>
+              Malha rodoviária · representação visual
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="trust-strip">
+        <p>Roteiro da apresentação</p>
+        <div class="trust-items">
+          <span><i>01</i> Problema</span>
+          <span><i>02</i> Dados</span>
+          <span><i>03</i> Resultados</span>
+          <span><i>04</i> Arquitetura</span>
+          <span><i>05</i> Desempenho</span>
+        </div>
+      </section>
+
+      <section class="section project-context presentation-slide" id="contexto" data-title="Problema e objetivo">
+        <div class="chapter-heading">
+          <span class="chapter-number">01</span>
+          <div>
+            <span class="section-index">O PROBLEMA</span>
+            <h2>Os dados existem.<br />O desafio é transformá-los em entendimento.</h2>
+          </div>
+        </div>
+
+        <div class="context-layout">
+          <article class="problem-statement">
+            <p class="statement-lead">
+              A PRF publica grandes volumes de dados, mas arquivos brutos não
+              respondem sozinhos às perguntas de quem precisa analisá-los.
+            </p>
+            <p>
+              É necessário coletar diferentes anos, corrigir formatos, evitar
+              contagens duplicadas, armazenar os registros e oferecer uma forma
+              simples de explorar os resultados.
+            </p>
+          </article>
+
+          <div class="objective-grid">
+            <article>
+              <span>01</span>
+              <h3>Centralizar</h3>
+              <p>Reunir ocorrências, pessoas e causas em uma base consultável.</p>
+            </article>
+            <article>
+              <span>02</span>
+              <h3>Analisar</h3>
+              <p>Transformar milhões de relações em indicadores compreensíveis.</p>
+            </article>
+            <article>
+              <span>03</span>
+              <h3>Reproduzir</h3>
+              <p>Executar toda a solução da mesma forma por meio de containers.</p>
+            </article>
+            <article>
+              <span>04</span>
+              <h3>Mensurar</h3>
+              <p>Acompanhar carga, latência, banco, CPU e memória da aplicação.</p>
+            </article>
+          </div>
+        </div>
+
+        <div class="project-question">
+          <span>Pergunta norteadora</span>
+          <strong>
+            Como transformar dados abertos da PRF em uma plataforma analítica,
+            reproduzível e observável?
+          </strong>
+        </div>
+      </section>
+
+      <section class="section panorama presentation-slide" id="panorama" data-title="Base e indicadores">
+        <div class="section-heading">
+          <div>
+            <span class="section-index">02 / A BASE DE DADOS</span>
+            <h2>Dimensão do levantamento.</h2>
+          </div>
+          <p>
+            Foram integrados três conjuntos anuais da PRF. Selecione um período
+            para demonstrar como a aplicação consulta e atualiza os resultados.
+          </p>
+        </div>
+
+        <div class="filter-bar" role="group" aria-label="Filtrar por ano">
+          <span>Período analisado</span>
+          <div class="year-options" id="year-options">
+            <button class="active" data-year="">Todos os anos</button>
+          </div>
+          <span class="data-status" id="data-status">
+            <i></i> Base conectada
+          </span>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card featured">
+            <span class="metric-label">Acidentes registrados</span>
+            <strong id="metric-accidents">—</strong>
+            <div class="metric-meta">
+              <span id="metric-daily">— por dia</span>
+              <span>Base PRF</span>
+            </div>
+          </article>
+          <article class="metric-card">
+            <span class="metric-icon">+</span>
+            <span class="metric-label">Pessoas envolvidas</span>
+            <strong id="metric-people">—</strong>
+            <p>Registros associados às ocorrências selecionadas.</p>
+          </article>
+          <article class="metric-card">
+            <span class="metric-icon alert">!</span>
+            <span class="metric-label">Pessoas feridas</span>
+            <strong id="metric-injured">—</strong>
+            <p id="injured-rate">— do total de envolvidos.</p>
+          </article>
+          <article class="metric-card">
+            <span class="metric-icon fatal">×</span>
+            <span class="metric-label">Vidas perdidas</span>
+            <strong id="metric-deaths">—</strong>
+            <p id="death-rate">— mortes a cada 100 acidentes.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section analysis-section presentation-slide" id="analises" data-title="Resultados analíticos">
+        <div class="section-heading compact">
+          <div>
+            <span class="section-index">03 / RESULTADOS</span>
+            <h2>O que a aplicação permite observar.</h2>
+          </div>
+          <p>
+            A demonstração combina evolução temporal, distribuição territorial
+            e causas registradas sem transferir os CSVs completos ao navegador.
+          </p>
+        </div>
+
+        <div class="analysis-grid">
+          <article class="data-panel trend-panel">
+            <div class="panel-header">
+              <div>
+                <span class="panel-kicker">Evolução temporal</span>
+                <h3>Acidentes por mês</h3>
+              </div>
+              <div class="legend">
+                <span><i class="legend-accidents"></i> Acidentes</span>
+                <span><i class="legend-deaths"></i> Mortes</span>
+              </div>
+            </div>
+            <div class="chart-container" id="monthly-chart">
+              <div class="skeleton chart-skeleton"></div>
+            </div>
+          </article>
+
+          <article class="data-panel insight-panel">
+            <span class="panel-kicker">Leitura responsável</span>
+            <h3>Correlação não é causalidade.</h3>
+            <p>
+              Um estado com mais acidentes também pode ter maior extensão de
+              rodovias ou fluxo de veículos. Os gráficos ajudam a formular
+              perguntas, não a encerrar investigações.
+            </p>
+            <div class="insight-rule"></div>
+            <div class="insight-stat">
+              <span>O que comparar</span>
+              <strong>volume + gravidade + contexto</strong>
+            </div>
+            <a href="#metodologia" class="text-link">Entenda os limites →</a>
+          </article>
+
+          <article class="data-panel causes-panel">
+            <div class="panel-header">
+              <div>
+                <span class="panel-kicker">Fatores registrados</span>
+                <h3>Principais causas</h3>
+              </div>
+              <span class="panel-note">Top 6</span>
+            </div>
+            <div class="bar-list" id="causes-chart">
+              <div class="skeleton list-skeleton"></div>
+            </div>
+          </article>
+
+          <article class="data-panel states-panel">
+            <div class="panel-header">
+              <div>
+                <span class="panel-kicker">Distribuição territorial</span>
+                <h3>Estados com mais registros</h3>
+              </div>
+              <span class="panel-note">Top 5</span>
+            </div>
+            <div class="state-list" id="states-list">
+              <div class="skeleton list-skeleton"></div>
+            </div>
+          </article>
+        </div>
+
+        <div class="deep-analysis">
+          <div>
+            <span class="section-index">QUER INVESTIGAR MAIS?</span>
+            <h3>Abra o painel analítico completo.</h3>
+            <p>
+              Acesse filtros adicionais, perfil das vítimas e relações entre
+              condições meteorológicas, acidentes e mortes.
+            </p>
+          </div>
+          <a class="button button-light service-link" data-port="8501" href="#">
+            Acessar gráficos detalhados <span>↗</span>
+          </a>
+        </div>
+      </section>
+
+      <section class="section methodology presentation-slide" id="metodologia" data-title="Arquitetura">
+        <div class="method-intro">
+          <span class="section-index">04 / ARQUITETURA</span>
+          <h2>Do dado bruto<br />à apresentação.</h2>
+          <p>
+            Cada componente possui uma responsabilidade. A separação reduz
+            acoplamento e permite substituir ou escalar partes da solução.
+          </p>
+          <div class="tech-stack">
+            <span>Python</span><span>PostgreSQL</span><span>FastAPI</span>
+            <span>Nginx</span><span>Docker</span><span>Prometheus</span>
+          </div>
+        </div>
+        <div class="pipeline">
+          <article>
+            <span class="pipeline-number">01</span>
+            <div class="pipeline-icon">↓</div>
+            <h3>Coleta</h3>
+            <p>O scraper identifica e baixa os arquivos oficiais publicados pela PRF.</p>
+          </article>
+          <article>
+            <span class="pipeline-number">02</span>
+            <div class="pipeline-icon">◇</div>
+            <h3>Tratamento</h3>
+            <p>Datas, números e valores ausentes são normalizados em blocos seguros.</p>
+          </article>
+          <article>
+            <span class="pipeline-number">03</span>
+            <div class="pipeline-icon">▤</div>
+            <h3>Persistência</h3>
+            <p>Os registros tratados são organizados e indexados no PostgreSQL.</p>
+          </article>
+          <article>
+            <span class="pipeline-number">04</span>
+            <div class="pipeline-icon">⌁</div>
+            <h3>Análise</h3>
+            <p>A API agrega milhões de relações e entrega respostas leves ao frontend.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section ecosystem presentation-slide" id="ecossistema" data-title="Eficiência e observabilidade">
+        <div class="section-heading compact">
+          <div>
+            <span class="section-index">05 / EFICIÊNCIA</span>
+            <h2>Não basta funcionar.<br />É preciso medir.</h2>
+          </div>
+          <p>
+            Além das análises, acompanhe a saúde técnica da solução:
+            desempenho, banco, API e consumo dos containers.
+          </p>
+        </div>
+
+        <div class="service-grid">
+          <a class="service-card primary-service service-link" data-port="3000" href="#">
+            <span class="service-status"><i></i> Monitoramento</span>
+            <div class="service-symbol">G</div>
+            <h3>Eficiência e containers</h3>
+            <p>
+              CPU, memória, requisições por segundo, latência da API e conexões
+              do PostgreSQL no Grafana.
+            </p>
+            <span class="service-action">Abrir Grafana ↗</span>
+          </a>
+          <a class="service-card service-link" data-port="8000" data-path="/docs" href="#">
+            <span class="service-status"><i></i> Integração</span>
+            <div class="service-symbol">{ }</div>
+            <h3>Documentação da API</h3>
+            <p>Consulte rotas, filtros, parâmetros e respostas disponíveis.</p>
+            <span class="service-action">Abrir Swagger ↗</span>
+          </a>
+          <a class="service-card service-link" data-port="9090" href="#">
+            <span class="service-status"><i></i> Métricas</span>
+            <div class="service-symbol">P</div>
+            <h3>Prometheus</h3>
+            <p>Explore diretamente as séries temporais coletadas pela plataforma.</p>
+            <span class="service-action">Explorar métricas ↗</span>
+          </a>
+          <a class="service-card service-link" data-port="8080" href="#">
+            <span class="service-status"><i></i> Infraestrutura</span>
+            <div class="service-symbol">C</div>
+            <h3>cAdvisor</h3>
+            <p>Inspecione o consumo de recursos dos containers em execução.</p>
+            <span class="service-action">Ver containers ↗</span>
+          </a>
+        </div>
+
+        <div class="load-performance">
+          <div>
+            <span class="panel-kicker">Eficiência da ingestão</span>
+            <h3>Últimas cargas processadas</h3>
+          </div>
+          <div class="load-table" id="load-table">
+            <div class="skeleton list-skeleton"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section conclusion presentation-slide" id="conclusao" data-title="Conclusão">
+        <div class="conclusion-card">
+          <span class="section-index">06 / CONCLUSÃO</span>
+          <h2>Uma base pública transformada em uma solução completa.</h2>
+          <p>
+            O ROTA demonstra que coleta, engenharia de dados, visualização e
+            observabilidade podem trabalhar juntas em um ambiente reproduzível.
+          </p>
+          <div class="conclusion-points">
+            <div><strong>Dados</strong><span>organizados e rastreáveis</span></div>
+            <div><strong>Análise</strong><span>interativa e acessível</span></div>
+            <div><strong>Operação</strong><span>containerizada e monitorada</span></div>
+          </div>
+          <div class="conclusion-actions">
+            <a class="button button-light" href="#inicio">Voltar ao início ↑</a>
+            <a class="button button-outline service-link" data-port="3000" href="#">
+              Demonstrar o Grafana ↗
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-brand">
+        <a class="brand" href="#inicio">
+          <span class="brand-mark"><span></span><span></span><span></span></span>
+            <span>ROTA</span>
+        </a>
+        <p>Observatório de segurança viária baseado em dados públicos.</p>
+      </div>
+      <div class="footer-meta">
+        <span>Dados: Polícia Rodoviária Federal</span>
+        <span>Projeto acadêmico · 2026</span>
+      </div>
+    </footer>
+
+    <div class="tooltip" id="chart-tooltip"></div>
+    <aside class="presentation-controls" aria-label="Controles da apresentação">
+      <button id="previous-slide" type="button" aria-label="Seção anterior">↑</button>
+      <div>
+        <span id="slide-counter">01 / 07</span>
+        <strong id="slide-title">Abertura</strong>
+      </div>
+      <button id="next-slide" type="button" aria-label="Próxima seção">↓</button>
+    </aside>
+    <script src="/app.js"></script>
+  </body>
+</html>

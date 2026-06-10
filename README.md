@@ -1,69 +1,116 @@
-# Dados de acidentes da PRF
+# ROTA: análise containerizada de acidentes da PRF
 
-Este projeto baixa os dados anuais de acidentes disponibilizados no portal de
-dados abertos da Polícia Rodoviária Federal (PRF).
-Site: [text](https://www.gov.br/prf/pt-br/acesso-a-informacao/dados-abertos/dados-abertos-da-prf)
+O **ROTA** transforma os dados abertos de acidentes da Polícia Rodoviária
+Federal em uma aplicação web interativa, com armazenamento estruturado,
+gráficos, API e monitoramento dos containers.
 
-Para cada ano solicitado, o script baixa e extrai três arquivos:
+O projeto foi construído para responder perguntas como:
 
-- acidentes agrupados por ocorrência;
-- acidentes agrupados por pessoa;
-- acidentes agrupados por pessoa, incluindo todas as causas e tipos de
-  acidentes.
+- como o número de acidentes evolui ao longo do tempo;
+- quais estados concentram mais ocorrências;
+- quais causas aparecem com maior frequência;
+- quantas pessoas foram envolvidas, feridas ou mortas;
+- quanto tempo a aplicação leva para responder;
+- quanto CPU e memória os containers utilizam.
 
-Os arquivos ZIP são temporários. Depois da extração, somente os CSVs são
-mantidos.
+## Visão geral
 
-## Criar o ambiente virtual
+```text
+Portal da PRF
+     |
+     v
+Scraper -> arquivos CSV -> Loader -> PostgreSQL
+                                      |
+                                      v
+                                  FastAPI
+                                  /     \
+                                 v       v
+                         Frontend ROTA  Streamlit
 
-Na raiz do projeto, crie o `.venv`:
+Prometheus <--- API + PostgreSQL exporter + cAdvisor
+     |
+     v
+  Grafana
+```
+
+## Tecnologias
+
+- Python 3.12
+- FastAPI
+- PostgreSQL 17
+- Pandas
+- Streamlit e Plotly
+- HTML, CSS e JavaScript
+- Nginx
+- Prometheus
+- Grafana
+- cAdvisor
+- Docker Compose
+
+## Início rápido
+
+### Requisitos
+
+- Docker;
+- Docker Compose;
+- aproximadamente 3 GB livres para imagens, dados e volumes.
+
+### 1. Iniciar a aplicação
 
 ```bash
-python3 -m venv .venv
+docker compose up -d --build
 ```
 
-Ative o ambiente:
+### 2. Carregar os CSVs no banco
+
+Se os arquivos já estiverem nas pastas `data/2024`, `data/2025` e
+`data/2026`, execute:
 
 ```bash
-source .venv/bin/activate
+docker compose --profile load run --rm loader
 ```
 
-No Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Atualize o `pip` e instale as dependências:
+Para carregar apenas alguns anos:
 
 ```bash
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+docker compose run --rm loader python -m app.loader 2024 2025
 ```
 
-O ambiente precisa ser criado somente uma vez. Nas execuções seguintes, basta
-ativá-lo antes de rodar o script.
+### 3. Abrir a aplicação
 
-## Baixar os dados
+| Recurso | Endereço |
+| --- | --- |
+| Página inicial ROTA | http://localhost:3001 |
+| Dashboard analítico | http://localhost:8501 |
+| Documentação da API | http://localhost:8000/docs |
+| Grafana | http://localhost:3000 |
+| Prometheus | http://localhost:9090 |
+| cAdvisor | http://localhost:8080 |
 
-Baixar um ano:
+Credenciais iniciais do Grafana:
 
-```bash
-python prf_scraper.py 2025
+```text
+usuário: admin
+senha: admin
 ```
 
-Baixar vários anos:
+## Como os dados chegam à tela
 
-```bash
-python prf_scraper.py 2024 2025 2026
+1. O scraper baixa os arquivos publicados pela PRF.
+2. O loader lê os CSVs em blocos de 25 mil linhas.
+3. Os valores são normalizados e inseridos no PostgreSQL.
+4. A API executa consultas agregadas no banco.
+5. O frontend chama a API e monta indicadores e gráficos.
+6. Prometheus coleta métricas da API, do banco e dos containers.
+7. Grafana transforma essas métricas em painéis de desempenho.
+
+O frontend não lê os CSVs e não acessa o banco diretamente:
+
+```text
+Frontend -> API -> PostgreSQL
 ```
 
-Se um CSV já existir, ele será substituído somente após o novo arquivo ser
-baixado e extraído corretamente.
-
-## Organização dos arquivos
-
-Por padrão, cada ano é armazenado em uma pasta própria:
+## Dados esperados
 
 ```text
 data/
@@ -72,164 +119,94 @@ data/
 │   ├── pessoas.csv
 │   └── pessoas_todas_causas.csv
 ├── 2025/
-│   ├── ocorrencias.csv
-│   ├── pessoas.csv
-│   └── pessoas_todas_causas.csv
+│   └── ...
 └── 2026/
-    ├── ocorrencias.csv
-    ├── pessoas.csv
-    └── pessoas_todas_causas.csv
+    └── ...
 ```
 
-Os CSVs usam `;` como separador e são publicados pela PRF com codificação
-ISO-8859-1.
+Os CSVs da PRF utilizam:
 
-### `ocorrencias.csv`
+- separador `;`;
+- codificação `ISO-8859-1`;
+- `id` para identificar a ocorrência.
 
-Possui uma linha por acidente. Contém informações gerais como:
+O banco possui quatro tabelas principais:
 
-- data e horário;
-- UF, município, BR e quilômetro;
-- causa e tipo principal do acidente;
-- condição meteorológica e tipo de pista;
-- totais de pessoas, veículos, feridos e mortos;
-- latitude e longitude.
+| Tabela | Conteúdo |
+| --- | --- |
+| `ocorrencias` | Uma linha por acidente |
+| `pessoas` | Pessoas e veículos envolvidos |
+| `causas` | Causas e tipos associados às ocorrências |
+| `cargas` | Histórico e desempenho das importações |
 
-O campo `id` identifica o acidente e não se repete neste arquivo.
+## Baixar ou atualizar os dados
 
-### `pessoas.csv`
+O scraper é opcional. Use-o quando precisar buscar novamente os arquivos:
 
-Possui os dados das pessoas e dos veículos envolvidos:
-
-- `pesid`: identificação da pessoa;
-- `id_veiculo`: identificação do veículo;
-- idade, sexo e tipo de envolvido;
-- estado físico;
-- tipo, marca e ano do veículo;
-- causa principal e tipo principal do acidente.
-
-Um mesmo `id` aparece várias vezes porque um acidente pode envolver diversas
-pessoas e veículos.
-
-Algumas linhas representam somente veículos. Nelas, `pesid` pode ser igual a
-`0` e os campos da pessoa ficam como `NA`.
-
-### `pessoas_todas_causas.csv`
-
-É uma versão expandida de `pessoas.csv`. Cada pessoa ou veículo é repetido para
-todas as combinações de causas e tipos registradas no acidente.
-
-Os campos adicionais mais importantes são:
-
-- `causa_principal`: informa se aquela causa é a principal;
-- `causa_acidente`: causa registrada;
-- `ordem_tipo_acidente`: posição do tipo na sequência do acidente;
-- `tipo_acidente`: tipo ou evento ocorrido.
-
-O conteúdo de `pessoas.csv` corresponde ao recorte de
-`pessoas_todas_causas.csv` em que:
-
-```text
-causa_principal = "Sim"
-ordem_tipo_acidente = 1
+```bash
+docker compose --profile scrape run --rm scraper
 ```
 
-## Sugestão de conexão de dados
+Para selecionar anos diferentes:
 
-### Ocorrências com pessoas
-
-A conexão principal é feita pelo campo `id`:
-
-```sql
-SELECT *
-FROM ocorrencias AS o
-JOIN pessoas AS p
-    ON o.id = p.id;
+```bash
+docker compose run --rm scraper python prf_scraper.py 2023 2024 2025
 ```
 
-Essa relação é de um para muitos: uma ocorrência pode possuir várias pessoas e
-veículos.
+Depois do download, execute o loader novamente.
 
-### Ocorrências com todas as causas
+## Operação cotidiana
 
-Também é possível conectar diretamente pelo `id`:
+Ver o estado dos containers:
 
-```sql
-SELECT *
-FROM ocorrencias AS o
-JOIN pessoas_todas_causas AS ptc
-    ON o.id = ptc.id;
+```bash
+docker compose ps
 ```
 
-Use esse formato para estudar causas secundárias ou a sequência de tipos do
-acidente.
+Ver os logs:
 
-### Pessoas com todas as causas
-
-Para pessoas identificadas, use `id` e `pesid`:
-
-```sql
-SELECT *
-FROM pessoas AS p
-JOIN pessoas_todas_causas AS ptc
-    ON p.id = ptc.id
-   AND p.pesid = ptc.pesid
-WHERE p.pesid <> 0;
+```bash
+docker compose logs -f
 ```
 
-Para linhas que representam apenas veículos, use `id` e `id_veiculo`:
+Ver apenas os logs da API:
 
-```sql
-SELECT *
-FROM pessoas AS p
-JOIN pessoas_todas_causas AS ptc
-    ON p.id = ptc.id
-   AND p.id_veiculo = ptc.id_veiculo
-WHERE p.pesid = 0;
+```bash
+docker compose logs -f api
 ```
 
-Na maioria das análises, não é necessário conectar `pessoas.csv` com
-`pessoas_todas_causas.csv`. Escolha um deles:
+Parar a aplicação:
 
-- use `pessoas.csv` para análises gerais com a causa e o tipo principais;
-- use `pessoas_todas_causas.csv` quando causas secundárias ou múltiplos tipos
-  forem necessários.
-
-## Evitar contagens duplicadas
-
-Após um `JOIN`, os valores gerais da ocorrência serão repetidos para cada
-pessoa, causa e tipo. Por isso, não use `COUNT(*)` para contar acidentes.
-
-Para contar acidentes:
-
-```sql
-COUNT(DISTINCT id)
+```bash
+docker compose down
 ```
 
-Para contar pessoas identificadas:
+Parar e apagar banco e métricas persistidas:
 
-```sql
-COUNT(DISTINCT CONCAT(id, '-', pesid))
+```bash
+docker compose down -v
 ```
 
-Para contar veículos:
+> `docker compose down -v` apaga os dados carregados no PostgreSQL.
 
-```sql
-COUNT(DISTINCT CONCAT(id, '-', id_veiculo))
-```
+## Desenvolvimento
 
-Totais consolidados, como mortos e feridos por ocorrência, devem ser somados
-diretamente a partir de `ocorrencias.csv` ou depois de reduzir o resultado do
-`JOIN` para uma linha por `id`.
+As instruções técnicas, a descrição dos módulos, o fluxo interno e os
+procedimentos para alterar a aplicação estão em:
 
-## Modelo recomendado
+**[Guia de desenvolvimento](docs/DEVELOPMENT.md)**
 
-```text
-ocorrencias.id
-    ├── pessoas.id
-    └── pessoas_todas_causas.id
-```
+## Observação sobre WSL2
 
-Use `ocorrencias.csv` como tabela principal de acidentes e escolha
-`pessoas.csv` ou `pessoas_todas_causas.csv` como tabela detalhada, conforme a
-pergunta que será respondida.
+No Docker Desktop com backend WSL2, o cAdvisor pode mostrar métricas agregadas
+do host sem identificar corretamente o nome de cada container. Isso ocorre
+porque o armazenamento interno do Docker Desktop não fica totalmente exposto
+à distribuição Linux.
+
+API, frontend, banco, loader, Prometheus e Grafana continuam funcionando.
+
+## Fonte
+
+Dados abertos da Polícia Rodoviária Federal:
+
+https://www.gov.br/prf/pt-br/acesso-a-informacao/dados-abertos/dados-abertos-da-prf

@@ -1,0 +1,3 @@
+# Descoberta e download dos arquivos publicados pela PRF.
+gdown>=5.2,<6
+requests>=2.31,<3

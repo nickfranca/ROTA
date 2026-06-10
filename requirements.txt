@@ -1,2 +1,6 @@
-gdown>=5.2,<6
-requests>=2.31,<3
+# Instala todas as dependencias Python do projeto.
+# Para instalar apenas um componente, use os arquivos em requirements/.
+-r requirements/api.txt
+-r requirements/etl.txt
+-r requirements/dashboard.txt
+-r requirements/scraper.txt
