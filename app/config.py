@@ -1,15 +1,12 @@
+from __future__ import annotations
+
 import os
-from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
-class DatabaseConfig:
-    host: str = os.getenv("DB_HOST", "")
-    port: int = int(os.getenv("DB_PORT", "3306"))
-    database: str = os.getenv("DB_NAME", "")
-    user: str = os.getenv("DB_USER", "")
-    password: str = os.getenv("DB_PASSWORD", "")
-
-    @property
-    def enabled(self) -> bool:
-        return all([self.host, self.database, self.user, self.password])
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://prf:prf@localhost:5432/prf",
+)
+API_URL = os.getenv("API_URL", "http://localhost:8000")
+DATA_ROOT = os.getenv("DATA_ROOT", "/data")
+LOAD_CHUNK_SIZE = int(os.getenv("LOAD_CHUNK_SIZE", "25000"))

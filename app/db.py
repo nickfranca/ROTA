@@ -1,80 +1,49 @@
 from __future__ import annotations
 
-from typing import Iterable
+from contextlib import contextmanager
+from typing import Iterator
 
-import mysql.connector
-import pandas as pd
+from psycopg import Connection
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
-from app.config import DatabaseConfig
-
-
-def get_connection(config: DatabaseConfig):
-    return mysql.connector.connect(
-        host=config.host,
-        port=config.port,
-        database=config.database,
-        user=config.user,
-        password=config.password,
-    )
+from app.config import DATABASE_URL
 
 
-def save_viagens(config: DatabaseConfig, viagens: pd.DataFrame) -> None:
-    if not config.enabled:
-        return
-
-    rows = [
-        (
-            row.linha,
-            row.data_viagem.date().isoformat(),
-            row.horario_previsto,
-            row.horario_realizado,
-            int(row.passageiros),
-            row.status_viagem,
-            int(row.atraso_minutos),
-        )
-        for row in viagens.itertuples(index=False)
-    ]
-
-    sql = """
-        INSERT INTO viagens_tratadas
-        (linha, data_viagem, horario_previsto, horario_realizado, passageiros, status_viagem, atraso_minutos)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """
-    execute_many(config, sql, rows)
+pool = ConnectionPool(
+    conninfo=DATABASE_URL,
+    min_size=1,
+    max_size=10,
+    kwargs={"row_factory": dict_row},
+    open=False,
+)
 
 
-def save_estatisticas(config: DatabaseConfig, estatisticas: pd.DataFrame) -> None:
-    if not config.enabled:
-        return
-
-    rows = [
-        (
-            row.linha,
-            int(row.total_viagens),
-            int(row.total_passageiros),
-            float(row.media_atraso_minutos),
-            float(row.percentual_atrasadas),
-            row.modo_processamento,
-            float(row.tempo_execucao_segundos),
-        )
-        for row in estatisticas.itertuples(index=False)
-    ]
-
-    sql = """
-        INSERT INTO estatisticas_linha
-        (linha, total_viagens, total_passageiros, media_atraso_minutos,
-         percentual_atrasadas, modo_processamento, tempo_execucao_segundos)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """
-    execute_many(config, sql, rows)
+def open_pool() -> None:
+    if pool.closed:
+        pool.open()
+        pool.wait()
 
 
-def execute_many(config: DatabaseConfig, sql: str, rows: Iterable[tuple]) -> None:
-    connection = get_connection(config)
-    try:
-        cursor = connection.cursor()
-        cursor.executemany(sql, list(rows))
-        connection.commit()
-    finally:
-        cursor.close()
-        connection.close()
+def close_pool() -> None:
+    if not pool.closed:
+        pool.close()
+
+
+@contextmanager
+def connection() -> Iterator[Connection]:
+    open_pool()
+    with pool.connection() as conn:
+        yield conn
+
+
+def fetch_all(query: str, params: tuple = ()) -> list[dict]:
+    with connection() as conn, conn.cursor() as cursor:
+        cursor.execute(query, params)
+        return list(cursor.fetchall())
+
+
+def fetch_one(query: str, params: tuple = ()) -> dict:
+    with connection() as conn, conn.cursor() as cursor:
+        cursor.execute(query, params)
+        return cursor.fetchone() or {}

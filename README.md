@@ -1,118 +1,212 @@
-# Mobilidade ETL com Containers
+# ROTA: análise containerizada de acidentes da PRF
 
-Projeto acadêmico em Python para processar dados de mobilidade urbana usando Docker, MySQL e paralelismo simples.
+O **ROTA** transforma os dados abertos de acidentes da Polícia Rodoviária
+Federal em uma aplicação web interativa, com armazenamento estruturado,
+gráficos, API e monitoramento dos containers.
 
-A solução simula um pipeline ETL inspirado no processamento de dados públicos de trânsito e transporte. O arquivo CSV bruto é lido, tratado, processado de forma sequencial e paralela, e os resultados são gravados em arquivos CSV e no banco MySQL.
+O projeto foi construído para responder perguntas como:
 
-## Objetivo
+- como o número de acidentes evolui ao longo do tempo;
+- quais estados concentram mais ocorrências;
+- quais causas aparecem com maior frequência;
+- quantas pessoas foram envolvidas, feridas ou mortas;
+- quanto tempo a aplicação leva para responder;
+- quanto CPU e memória os containers utilizam.
 
-Organizar dados brutos de transporte público ou trânsito, removendo inconsistências e gerando estatísticas básicas para apoiar análises de mobilidade urbana.
-
-## Arquitetura
+## Visão geral
 
 ```text
-data/input/*.csv
-       |
-       v
-Container Python
-ETL sequencial e paralelo
-       |
-       v
-data/output/*.csv
-       |
-       v
-Container MySQL
-dados tratados e estatísticas
+Portal da PRF
+     |
+     v
+Scraper -> arquivos CSV -> Loader -> PostgreSQL
+                                      |
+                                      v
+                                  FastAPI
+                                  /     \
+                                 v       v
+                         Frontend ROTA  Streamlit
+
+Prometheus <--- API + PostgreSQL exporter + cAdvisor
+     |
+     v
+  Grafana
 ```
 
 ## Tecnologias
 
 - Python 3.12
+- FastAPI
+- PostgreSQL 17
 - Pandas
-- MySQL
-- Docker
+- Streamlit e Plotly
+- HTML, CSS e JavaScript
+- Nginx
+- Prometheus
+- Grafana
+- cAdvisor
 - Docker Compose
 
-## Estrutura
+## Início rápido
+
+### Requisitos
+
+- Docker;
+- Docker Compose;
+- aproximadamente 3 GB livres para imagens, dados e volumes.
+
+### 1. Iniciar a aplicação
+
+```bash
+docker compose up -d --build
+```
+
+### 2. Carregar os CSVs no banco
+
+Se os arquivos já estiverem nas pastas `data/2024`, `data/2025` e
+`data/2026`, execute:
+
+```bash
+docker compose --profile load run --rm loader
+```
+
+Para carregar apenas alguns anos:
+
+```bash
+docker compose run --rm loader python -m app.loader 2024 2025
+```
+
+### 3. Abrir a aplicação
+
+| Recurso | Endereço |
+| --- | --- |
+| Página inicial ROTA | http://localhost:3001 |
+| Dashboard analítico | http://localhost:8501 |
+| Documentação da API | http://localhost:8000/docs |
+| Grafana | http://localhost:3000 |
+| Prometheus | http://localhost:9090 |
+| cAdvisor | http://localhost:8080 |
+
+Credenciais iniciais do Grafana:
 
 ```text
-mobilidade-etl-containers/
-├── app/
-│   ├── config.py
-│   ├── db.py
-│   ├── etl.py
-│   └── main.py
-├── data/
-│   ├── input/
-│   │   └── viagens_exemplo.csv
-│   └── output/
-├── db/
-│   └── init.sql
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-└── README.md
+usuário: admin
+senha: admin
 ```
 
-## Como Executar com Docker
+## Como os dados chegam à tela
+
+1. O scraper baixa os arquivos publicados pela PRF.
+2. O loader lê os CSVs em blocos de 25 mil linhas.
+3. Os valores são normalizados e inseridos no PostgreSQL.
+4. A API executa consultas agregadas no banco.
+5. O frontend chama a API e monta indicadores e gráficos.
+6. Prometheus coleta métricas da API, do banco e dos containers.
+7. Grafana transforma essas métricas em painéis de desempenho.
+
+O frontend não lê os CSVs e não acessa o banco diretamente:
+
+```text
+Frontend -> API -> PostgreSQL
+```
+
+## Dados esperados
+
+```text
+data/
+├── 2024/
+│   ├── ocorrencias.csv
+│   ├── pessoas.csv
+│   └── pessoas_todas_causas.csv
+├── 2025/
+│   └── ...
+└── 2026/
+    └── ...
+```
+
+Os CSVs da PRF utilizam:
+
+- separador `;`;
+- codificação `ISO-8859-1`;
+- `id` para identificar a ocorrência.
+
+O banco possui quatro tabelas principais:
+
+| Tabela | Conteúdo |
+| --- | --- |
+| `ocorrencias` | Uma linha por acidente |
+| `pessoas` | Pessoas e veículos envolvidos |
+| `causas` | Causas e tipos associados às ocorrências |
+| `cargas` | Histórico e desempenho das importações |
+
+## Baixar ou atualizar os dados
+
+O scraper é opcional. Use-o quando precisar buscar novamente os arquivos:
 
 ```bash
-docker compose up --build
+docker compose --profile scrape run --rm scraper
 ```
 
-O serviço `app` aguarda o MySQL iniciar, processa os dados e grava os resultados.
-
-## Como Executar Localmente
+Para selecionar anos diferentes:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m app.main --input data/input/viagens_exemplo.csv
+docker compose run --rm scraper python prf_scraper.py 2023 2024 2025
 ```
 
-Para salvar no MySQL local, configure as variáveis de ambiente:
+Depois do download, execute o loader novamente.
+
+## Operação cotidiana
+
+Ver o estado dos containers:
 
 ```bash
-export DB_HOST=localhost
-export DB_PORT=3306
-export DB_NAME=mobilidade
-export DB_USER=mobilidade_user
-export DB_PASSWORD=mobilidade_pass
-python -m app.main --input data/input/viagens_exemplo.csv
+docker compose ps
 ```
 
-## Colunas Esperadas no CSV
+Ver os logs:
 
-O pipeline espera um CSV com as seguintes colunas:
+```bash
+docker compose logs -f
+```
 
-- `linha`
-- `data`
-- `horario_previsto`
-- `horario_realizado`
-- `passageiros`
-- `status`
+Ver apenas os logs da API:
 
-## Estatísticas Geradas
+```bash
+docker compose logs -f api
+```
 
-- total de viagens por linha;
-- total de passageiros por linha;
-- média de atraso por linha;
-- percentual de viagens atrasadas;
-- comparação de tempo entre processamento sequencial e paralelo.
+Parar a aplicação:
 
-## Paralelismo
+```bash
+docker compose down
+```
 
-O processamento paralelo divide o DataFrame em blocos e processa cada bloco usando `ProcessPoolExecutor`.
+Parar e apagar banco e métricas persistidas:
 
-Isso permite comparar:
+```bash
+docker compose down -v
+```
 
-- processamento sequencial: arquivo inteiro em uma única etapa;
-- processamento paralelo: arquivo dividido em partes processadas simultaneamente.
+> `docker compose down -v` apaga os dados carregados no PostgreSQL.
 
-## Próximas Evoluções
+## Desenvolvimento
 
-- integrar coleta real via API ou scraping do portal de Acesso à Informação de Palmas;
-- adicionar interface web em Laravel ou outro frontend;
-- incluir gráficos e filtros por linha, data e status;
-- adicionar testes automatizados.
+As instruções técnicas, a descrição dos módulos, o fluxo interno e os
+procedimentos para alterar a aplicação estão em:
+
+**[Guia de desenvolvimento](docs/DEVELOPMENT.md)**
+
+## Observação sobre WSL2
+
+No Docker Desktop com backend WSL2, o cAdvisor pode mostrar métricas agregadas
+do host sem identificar corretamente o nome de cada container. Isso ocorre
+porque o armazenamento interno do Docker Desktop não fica totalmente exposto
+à distribuição Linux.
+
+API, frontend, banco, loader, Prometheus e Grafana continuam funcionando.
+
+## Fonte
+
+Dados abertos da Polícia Rodoviária Federal:
+
+https://www.gov.br/prf/pt-br/acesso-a-informacao/dados-abertos/dados-abertos-da-prf
