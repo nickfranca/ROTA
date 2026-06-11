@@ -15,6 +15,18 @@ O projeto foi construído para responder perguntas como:
 
 ## Visão geral
 
+<p align="center">
+  <img
+    src="docs/architecture.png"
+    alt="Arquitetura do ROTA: coleta dos dados da PRF, processamento paralelo, PostgreSQL, API, interfaces e observabilidade"
+    width="100%"
+  />
+</p>
+
+<p align="center"><em>Arquitetura completa da coleta, processamento, consulta e observabilidade.</em></p>
+
+### Fluxo resumido
+
 ```text
 Portal da PRF
      |

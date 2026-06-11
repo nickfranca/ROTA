@@ -65,6 +65,13 @@ perfeitamente linear, pois todos compartilham CPU, disco, índices e PostgreSQL.
 
 ## 6. Arquitetura
 
+![Arquitetura completa do ROTA](architecture.png)
+
+*Fluxo de dados, distribuição dos workers, serviços da aplicação e camada de
+observabilidade.*
+
+### Fluxo resumido
+
 ```text
 Portal PRF
     |
