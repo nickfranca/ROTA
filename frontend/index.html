@@ -25,6 +25,8 @@
       <nav class="desktop-nav" aria-label="Navegação principal">
         <a href="#contexto">Projeto</a>
         <a href="#panorama">Resultados</a>
+        <a href="#paralelismo">Paralelismo</a>
+        <a href="#containers">Containers</a>
         <a href="#metodologia">Arquitetura</a>
         <a href="#ecossistema">Desempenho</a>
       </nav>
@@ -123,11 +125,12 @@
       <section class="trust-strip">
         <p>Roteiro da apresentação</p>
         <div class="trust-items">
-          <span><i>01</i> Problema</span>
-          <span><i>02</i> Dados</span>
-          <span><i>03</i> Resultados</span>
-          <span><i>04</i> Arquitetura</span>
-          <span><i>05</i> Desempenho</span>
+            <span><i>01</i> Problema</span>
+            <span><i>02</i> Dados</span>
+            <span><i>03</i> Paralelismo</span>
+            <span><i>04</i> Containers</span>
+            <span><i>05</i> Arquitetura</span>
+            <span><i>06</i> Desempenho</span>
         </div>
       </section>
 
@@ -238,10 +241,113 @@
         </div>
       </section>
 
+      <section class="section parallelism presentation-slide" id="paralelismo" data-title="Paralelismo">
+        <div class="section-heading compact">
+          <div>
+            <span class="section-index">03 / PARALELISMO</span>
+            <h2>Dividir por ano reduz o tempo de carga.</h2>
+          </div>
+          <p>
+            Aqui está o motivo central do projeto: os dados de cada ano podem
+            ser processados ao mesmo tempo, em vez de esperar um ano terminar
+            para começar o próximo.
+          </p>
+        </div>
+
+        <div class="parallel-layout">
+          <article class="parallel-card emphasize">
+            <span class="panel-kicker">Modelo adotado</span>
+            <h3>Mestre-trabalhador</h3>
+            <p>
+              Um coordenador distribui os anos e vários workers executam a
+              mesma tarefa em paralelo. Cada worker lida com um subconjunto
+              independente do problema.
+            </p>
+            <ul class="bullet-list">
+              <li>1 worker = execução sequencial, linha de base</li>
+              <li>2 workers = dois anos ao mesmo tempo</li>
+              <li>3 workers = três anos ao mesmo tempo</li>
+            </ul>
+          </article>
+
+          <div class="parallel-grid">
+            <article>
+              <span>Por que funciona</span>
+              <h3>Os anos são independentes</h3>
+              <p>2024, 2025 e 2026 têm conjuntos separados de registros.</p>
+            </article>
+            <article>
+              <span>O que melhora</span>
+              <h3>Tempo total de ingestão</h3>
+              <p>Enquanto um worker lê um ano, outro já prepara o próximo.</p>
+            </article>
+            <article>
+              <span>Limite prático</span>
+              <h3>Ganho não é linear</h3>
+              <p>CPU, disco e PostgreSQL continuam sendo recursos compartilhados.</p>
+            </article>
+            <article>
+              <span>Resultado medido</span>
+              <h3>Speedup de 1,873</h3>
+              <p>Com três workers, o tempo médio caiu de 24,135 s para 12,886 s.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section containers presentation-slide" id="containers" data-title="Containers">
+        <div class="section-heading compact">
+          <div>
+            <span class="section-index">04 / CONTAINERIZAÇÃO</span>
+            <h2>Cada parte da solução vive em seu próprio container.</h2>
+          </div>
+          <p>
+            Isso evita instalação manual, facilita a apresentação e mantém o
+            projeto reproduzível em qualquer máquina com Docker.
+          </p>
+        </div>
+
+        <div class="container-grid">
+          <article class="container-card">
+            <span>Frontend</span>
+            <h3>Interface do usuário</h3>
+            <p>Entrega a página e encaminha chamadas para a API via Nginx.</p>
+          </article>
+          <article class="container-card">
+            <span>API</span>
+            <h3>Camada de consulta</h3>
+            <p>Recebe requisições HTTP e consulta o PostgreSQL.</p>
+          </article>
+          <article class="container-card">
+            <span>Banco</span>
+            <h3>Persistência</h3>
+            <p>Armazena ocorrências, pessoas, causas e histórico de cargas.</p>
+          </article>
+          <article class="container-card">
+            <span>Monitoramento</span>
+            <h3>Prometheus e Grafana</h3>
+            <p>Coletam e exibem métricas de desempenho e saúde do sistema.</p>
+          </article>
+        </div>
+
+        <div class="benefit-band">
+          <div>
+            <span class="panel-kicker">Vantagens práticas</span>
+            <h3>Por que usar containers?</h3>
+          </div>
+          <div class="benefit-list">
+            <span>Ambiente igual para todos</span>
+            <span>Menos conflito de dependências</span>
+            <span>Execução com um comando</span>
+            <span>Serviços separados e organizados</span>
+          </div>
+        </div>
+      </section>
+
       <section class="section analysis-section presentation-slide" id="analises" data-title="Resultados analíticos">
         <div class="section-heading compact">
           <div>
-            <span class="section-index">03 / RESULTADOS</span>
+            <span class="section-index">05 / RESULTADOS</span>
             <h2>O que a aplicação permite observar.</h2>
           </div>
           <p>
@@ -327,7 +433,7 @@
 
       <section class="section methodology presentation-slide" id="metodologia" data-title="Arquitetura">
         <div class="method-intro">
-          <span class="section-index">04 / ARQUITETURA</span>
+          <span class="section-index">06 / ARQUITETURA</span>
           <h2>Do dado bruto<br />à apresentação.</h2>
           <p>
             Cada componente possui uma responsabilidade. A separação reduz
@@ -369,7 +475,7 @@
       <section class="section ecosystem presentation-slide" id="ecossistema" data-title="Eficiência e observabilidade">
         <div class="section-heading compact">
           <div>
-            <span class="section-index">05 / EFICIÊNCIA</span>
+            <span class="section-index">07 / EFICIÊNCIA</span>
             <h2>Não basta funcionar.<br />É preciso medir.</h2>
           </div>
           <p>
@@ -425,11 +531,12 @@
 
       <section class="section conclusion presentation-slide" id="conclusao" data-title="Conclusão">
         <div class="conclusion-card">
-          <span class="section-index">06 / CONCLUSÃO</span>
+          <span class="section-index">08 / CONCLUSÃO</span>
           <h2>Uma base pública transformada em uma solução completa.</h2>
           <p>
-            O ROTA demonstra que coleta, engenharia de dados, visualização e
-            observabilidade podem trabalhar juntas em um ambiente reproduzível.
+            O ROTA demonstra conceitos de Sistemas Paralelos e Distribuídos
+            por meio de processamento concorrente, serviços containerizados,
+            visualização e observabilidade.
           </p>
           <div class="conclusion-points">
             <div><strong>Dados</strong><span>organizados e rastreáveis</span></div>
@@ -456,7 +563,8 @@
       </div>
       <div class="footer-meta">
         <span>Dados: Polícia Rodoviária Federal</span>
-        <span>Projeto acadêmico · 2026</span>
+        <span>Nicole França e Davi Teixeira</span>
+        <span>Sistemas Paralelos e Distribuídos · 2026</span>
       </div>
     </footer>
 
