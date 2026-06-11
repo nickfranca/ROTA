@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from time import perf_counter
 
 import pandas as pd
 import psycopg
 
-from app.config import DATABASE_URL, DATA_ROOT, LOAD_CHUNK_SIZE
+from app.config import DATABASE_URL, DATA_ROOT, LOAD_CHUNK_SIZE, LOAD_WORKERS
 
 
 logging.basicConfig(
@@ -104,6 +107,35 @@ INTEGER_COLUMNS = {
 FLOAT_COLUMNS = {"br", "km", "latitude", "longitude"}
 
 
+@dataclass(frozen=True)
+class FileLoadResult:
+    year: int
+    filename: str
+    table: str
+    rows: int
+    bytes: int
+    duration_seconds: float
+
+
+@dataclass(frozen=True)
+class LoadResult:
+    workers: int
+    years: list[int]
+    rows: int
+    bytes: int
+    duration_seconds: float
+    files: list[FileLoadResult]
+
+    @property
+    def rows_per_second(self) -> float:
+        return self.rows / self.duration_seconds if self.duration_seconds else 0.0
+
+    def to_dict(self) -> dict:
+        result = asdict(self)
+        result["rows_per_second"] = self.rows_per_second
+        return result
+
+
 def _clean_chunk(chunk: pd.DataFrame, year: int) -> pd.DataFrame:
     chunk = chunk.replace({"NA": None, "N/A": None, "": None})
     for column in chunk.columns.intersection(INTEGER_COLUMNS):
@@ -161,8 +193,9 @@ def load_file(
     return rows
 
 
-def load_year(conn: psycopg.Connection, year_dir: Path) -> None:
+def load_year(conn: psycopg.Connection, year_dir: Path) -> list[FileLoadResult]:
     year = int(year_dir.name)
+    results: list[FileLoadResult] = []
     for filename, (table, columns) in DATASETS.items():
         path = year_dir / filename
         if not path.exists():
@@ -182,34 +215,121 @@ def load_year(conn: psycopg.Connection, year_dir: Path) -> None:
                 """,
                 (year, filename, table, rows, path.stat().st_size, duration),
             )
+        results.append(
+            FileLoadResult(
+                year=year,
+                filename=filename,
+                table=table,
+                rows=rows,
+                bytes=path.stat().st_size,
+                duration_seconds=duration,
+            )
+        )
         LOGGER.info(
             "%s concluido: %s linhas em %.2fs",
             filename,
             f"{rows:,}",
             duration,
         )
+    return results
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Carrega CSVs da PRF no PostgreSQL")
-    parser.add_argument("years", nargs="*", type=int)
-    args = parser.parse_args()
+def _load_year_worker(year_dir: str) -> list[FileLoadResult]:
+    with psycopg.connect(DATABASE_URL) as conn:
+        return load_year(conn, Path(year_dir))
 
-    root = Path(DATA_ROOT)
-    requested = set(args.years)
-    year_dirs = [
+
+def discover_year_dirs(root: Path, years: set[int] | None = None) -> list[Path]:
+    requested = years or set()
+    return [
         path
         for path in sorted(root.iterdir())
         if path.is_dir()
         and path.name.isdigit()
         and (not requested or int(path.name) in requested)
     ]
+
+
+def load_dataset(year_dirs: list[Path], workers: int = 1) -> LoadResult:
+    if workers < 1:
+        raise ValueError("A quantidade de workers deve ser pelo menos 1")
+    if not year_dirs:
+        raise ValueError("Nenhuma pasta anual foi informada")
+
+    effective_workers = min(workers, len(year_dirs))
+    started = perf_counter()
+    files: list[FileLoadResult] = []
+
+    if effective_workers == 1:
+        with psycopg.connect(DATABASE_URL) as conn:
+            for year_dir in year_dirs:
+                files.extend(load_year(conn, year_dir))
+    else:
+        LOGGER.info(
+            "Distribuindo %s anos entre %s workers",
+            len(year_dirs),
+            effective_workers,
+        )
+        with ProcessPoolExecutor(max_workers=effective_workers) as executor:
+            futures = {
+                executor.submit(_load_year_worker, str(year_dir)): year_dir
+                for year_dir in year_dirs
+            }
+            for future in as_completed(futures):
+                year_dir = futures[future]
+                try:
+                    files.extend(future.result())
+                except Exception:
+                    LOGGER.exception("Falha no worker responsável por %s", year_dir.name)
+                    raise
+
+    duration = perf_counter() - started
+    files.sort(key=lambda item: (item.year, item.filename))
+    return LoadResult(
+        workers=effective_workers,
+        years=[int(path.name) for path in year_dirs],
+        rows=sum(item.rows for item in files),
+        bytes=sum(item.bytes for item in files),
+        duration_seconds=duration,
+        files=files,
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Carrega CSVs da PRF no PostgreSQL")
+    parser.add_argument("years", nargs="*", type=int)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=LOAD_WORKERS,
+        help="Anos processados simultaneamente (padrao: %(default)s)",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Exibe o resumo final em JSON",
+    )
+    args = parser.parse_args()
+
+    root = Path(DATA_ROOT)
+    year_dirs = discover_year_dirs(root, set(args.years))
     if not year_dirs:
         raise SystemExit(f"Nenhuma pasta anual encontrada em {root}")
 
-    with psycopg.connect(DATABASE_URL) as conn:
-        for year_dir in year_dirs:
-            load_year(conn, year_dir)
+    try:
+        result = load_dataset(year_dirs, args.workers)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
+
+    LOGGER.info(
+        "Carga concluida com %s worker(s): %s linhas em %.2fs (%.2f linhas/s)",
+        result.workers,
+        f"{result.rows:,}",
+        result.duration_seconds,
+        result.rows_per_second,
+    )
+    if args.json:
+        print(json.dumps(result.to_dict(), ensure_ascii=True))
 
 
 if __name__ == "__main__":

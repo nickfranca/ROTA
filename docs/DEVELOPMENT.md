@@ -13,7 +13,9 @@ aplicação.
 │   ├── config.py          # Variáveis de ambiente
 │   ├── dashboard.py       # Dashboard complementar Streamlit
 │   ├── db.py              # Pool de conexões PostgreSQL
-│   └── loader.py          # ETL e carga dos CSVs
+│   ├── loader.py          # ETL sequencial e paralelo
+│   └── benchmark.py       # Medição de speedup e throughput
+├── benchmark/results/     # Resultados reproduzíveis
 ├── data/
 │   └── ANO/*.csv          # Dados brutos, ignorados pelo Git
 ├── db/
@@ -33,6 +35,9 @@ aplicação.
 │   ├── dashboard.txt
 │   ├── etl.txt
 │   └── scraper.txt
+├── scripts/
+│   └── generate_sample_data.py
+├── tests/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── prf_scraper.py
@@ -96,7 +101,31 @@ DELETE do ano -> COPY dos novos registros -> registro em cargas -> COMMIT
 
 Se a carga falhar, a transação é desfeita.
 
-### 2.3 Banco de dados
+### 2.3 Paralelismo da carga
+
+O loader usa o padrão mestre-trabalhador:
+
+```text
+Coordenador
+  ├── worker 1 -> ano 2024 -> conexão e transação próprias
+  ├── worker 2 -> ano 2025 -> conexão e transação próprias
+  └── worker 3 -> ano 2026 -> conexão e transação próprias
+```
+
+O `ProcessPoolExecutor` cria processos independentes. A unidade de divisão é o
+ano porque as exclusões e inserções usam `ano_fonte`; assim, os workers não
+alteram o mesmo conjunto lógico de registros.
+
+Com um worker, o fluxo é sequencial e serve como baseline. Com dois ou três,
+anos diferentes são processados simultaneamente:
+
+```bash
+docker compose run --rm loader python -m app.loader --workers 1
+docker compose run --rm loader python -m app.loader --workers 2
+docker compose run --rm loader python -m app.loader --workers 3
+```
+
+### 2.4 Banco de dados
 
 `db/init.sql` é executado automaticamente quando o volume do PostgreSQL é
 criado pela primeira vez.
@@ -120,7 +149,7 @@ Cuidados importantes:
 - não some mortos ou feridos depois de um `JOIN` sem reduzir para uma linha
   por ocorrência.
 
-### 2.4 API
+### 2.5 API
 
 `app/api.py` contém as rotas FastAPI.
 
@@ -155,7 +184,7 @@ Os filtros opcionais usam parâmetros SQL:
 
 Não monte SQL concatenando valores recebidos pela URL.
 
-### 2.5 Frontend principal
+### 2.6 Frontend principal
 
 O frontend é uma aplicação estática servida pelo Nginx.
 
@@ -183,7 +212,7 @@ Isso evita depender de CORS ou de um endereço fixo da API no JavaScript.
 Os gráficos da página principal são SVGs produzidos pelo próprio `app.js`.
 Não há biblioteca JavaScript externa nem CDN.
 
-### 2.6 Dashboard Streamlit
+### 2.7 Dashboard Streamlit
 
 `app/dashboard.py` oferece análises complementares com Pandas e Plotly.
 
@@ -196,7 +225,7 @@ Streamlit -> FastAPI -> PostgreSQL
 
 O cache do Streamlit possui TTL de 60 segundos.
 
-### 2.7 Observabilidade
+### 2.8 Observabilidade
 
 A API registra:
 
@@ -230,6 +259,7 @@ dashboard de desempenho.
 | `cadvisor` | Recursos dos containers | `8080` |
 | `postgres-exporter` | Métricas do banco | apenas interno |
 | `loader` | Processo de importação | perfil `load` |
+| `benchmark` | Compara 1, 2 e 3 workers | perfil `benchmark` |
 | `scraper` | Processo de download | perfil `scrape` |
 
 `loader` e `scraper` são tarefas, não serviços permanentes. Por isso ficam em
@@ -243,6 +273,7 @@ profiles e encerram depois da execução.
 | `API_URL` | `http://localhost:8000` | Streamlit |
 | `DATA_ROOT` | `/data` | Diretório lido pelo loader |
 | `LOAD_CHUNK_SIZE` | `25000` | Linhas por bloco |
+| `LOAD_WORKERS` | `1` | Processos simultâneos do loader |
 
 No Compose, os nomes dos serviços funcionam como DNS:
 
@@ -339,6 +370,33 @@ Validar o Compose:
 ```bash
 docker compose config --quiet
 ```
+
+Executar testes automatizados:
+
+```bash
+docker compose --profile load run --rm loader python -m unittest discover -v
+```
+
+Executar o benchmark reproduzível:
+
+```bash
+docker compose --profile benchmark run --rm benchmark
+```
+
+O benchmark usa três repetições por configuração e alterna a ordem de execução:
+
+```text
+repetição 1: 1, 2, 3 workers
+repetição 2: 2, 3, 1 workers
+repetição 3: 3, 1, 2 workers
+```
+
+Essa rotação reduz o viés causado pelo aquecimento de cache e armazenamento.
+Os arquivos gerados são:
+
+- `benchmark/results/runs.csv`;
+- `benchmark/results/summary.csv`;
+- `benchmark/results/RESULTS.md`.
 
 Validar espaços e conflitos no diff:
 
