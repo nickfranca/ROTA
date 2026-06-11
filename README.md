@@ -2,7 +2,7 @@
 
 O **ROTA** transforma os dados abertos de acidentes da Polícia Rodoviária
 Federal em uma aplicação web interativa, com armazenamento estruturado,
-gráficos, API e monitoramento dos containers.
+gráficos, API, carga paralela e monitoramento dos containers.
 
 O projeto foi construído para responder perguntas como:
 
@@ -19,13 +19,19 @@ O projeto foi construído para responder perguntas como:
 Portal da PRF
      |
      v
-Scraper -> arquivos CSV -> Loader -> PostgreSQL
-                                      |
-                                      v
-                                  FastAPI
-                                  /     \
-                                 v       v
-                         Frontend ROTA  Streamlit
+Scraper -> arquivos CSV -> Coordenador
+                              / | \
+                             v  v  v
+                        workers por ano
+                              \ | /
+                               v
+                          PostgreSQL
+                               |
+                               v
+                           FastAPI
+                           /     \
+                          v       v
+                  Frontend ROTA  Streamlit
 
 Prometheus <--- API + PostgreSQL exporter + cAdvisor
      |
@@ -46,6 +52,7 @@ Prometheus <--- API + PostgreSQL exporter + cAdvisor
 - Grafana
 - cAdvisor
 - Docker Compose
+- multiprocessing com `ProcessPoolExecutor`
 
 ## Início rápido
 
@@ -76,6 +83,12 @@ Para carregar apenas alguns anos:
 docker compose run --rm loader python -m app.loader 2024 2025
 ```
 
+Para distribuir os anos entre três workers:
+
+```bash
+docker compose run --rm loader python -m app.loader --workers 3 2024 2025 2026
+```
+
 ### 3. Abrir a aplicação
 
 | Recurso | Endereço |
@@ -98,11 +111,13 @@ senha: admin
 
 1. O scraper baixa os arquivos publicados pela PRF.
 2. O loader lê os CSVs em blocos de 25 mil linhas.
-3. Os valores são normalizados e inseridos no PostgreSQL.
-4. A API executa consultas agregadas no banco.
-5. O frontend chama a API e monta indicadores e gráficos.
-6. Prometheus coleta métricas da API, do banco e dos containers.
-7. Grafana transforma essas métricas em painéis de desempenho.
+3. O processo coordenador distribui anos diferentes entre os workers.
+4. Cada worker normaliza os valores e usa sua própria transação PostgreSQL.
+5. Os dados são inseridos com `COPY`.
+6. A API executa consultas agregadas no banco.
+7. O frontend chama a API e monta indicadores e gráficos.
+8. Prometheus coleta métricas da API, do banco e dos containers.
+9. Grafana transforma essas métricas em painéis de desempenho.
 
 O frontend não lê os CSVs e não acessa o banco diretamente:
 
@@ -138,6 +153,64 @@ O banco possui quatro tabelas principais:
 | `pessoas` | Pessoas e veículos envolvidos |
 | `causas` | Causas e tipos associados às ocorrências |
 | `cargas` | Histórico e desempenho das importações |
+
+## Paralelismo e benchmark
+
+O loader implementa uma arquitetura mestre-trabalhador. O processo principal
+descobre as pastas anuais e distribui cada ano para um processo independente.
+Cada worker abre sua própria conexão com o PostgreSQL e processa apenas os
+registros do ano recebido.
+
+Executar o benchmark completo:
+
+```bash
+docker compose --profile benchmark run --rm benchmark
+```
+
+O experimento processa os mesmos 2.007.544 registros com 1, 2 e 3 workers,
+usando três repetições e ordem rotativa. Os resultados ficam em
+`benchmark/results/`.
+
+Resultado medido em 11 de junho de 2026:
+
+| Workers | Tempo médio | Linhas/s | Speedup | Eficiência |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 24,135 s | 83.482 | 1,000 | 100,00% |
+| 2 | 17,274 s | 116.697 | 1,397 | 69,86% |
+| 3 | 12,886 s | 156.229 | 1,873 | 62,43% |
+
+Com três workers, o tempo médio caiu aproximadamente 46,6%. A eficiência não é
+linear porque os processos compartilham disco, CPU, índices e o mesmo servidor
+PostgreSQL.
+
+Relatórios:
+
+- [relatório técnico](docs/RELATORIO_TECNICO.md);
+- [guia de estudo e apresentação](docs/GUIA_APRESENTACAO.md);
+- [resultado do benchmark](benchmark/results/RESULTS.md);
+- [amostras brutas](benchmark/results/runs.csv);
+- [resumo estatístico](benchmark/results/summary.csv).
+
+## Testes
+
+Executar os testes no mesmo ambiente da aplicação:
+
+```bash
+docker compose --profile load run --rm loader python -m unittest discover -v
+```
+
+Os testes cobrem normalização do ETL, descoberta dos anos, cálculo de speedup,
+descoberta dos arquivos da PRF e validação de ZIP.
+
+Para gerar entradas pequenas sem baixar os dados reais:
+
+```bash
+mkdir -p sample-data
+docker compose run --rm \
+  -v "$PWD/sample-data:/sample-data" \
+  loader python scripts/generate_sample_data.py \
+  --output /sample-data --rows 1000
+```
 
 ## Baixar ou atualizar os dados
 

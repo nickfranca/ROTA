@@ -45,6 +45,34 @@ services:
         condition: service_healthy
     profiles: ["load"]
 
+  benchmark:
+    build: .
+    command:
+      [
+        "python",
+        "-m",
+        "app.benchmark",
+        "--workers",
+        "1",
+        "2",
+        "3",
+        "--repetitions",
+        "3",
+        "--output",
+        "/results",
+      ]
+    environment:
+      DATABASE_URL: postgresql://prf:prf@db:5432/prf
+      DATA_ROOT: /data
+      LOAD_CHUNK_SIZE: 25000
+    volumes:
+      - ./data:/data:ro
+      - ./benchmark/results:/results
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["benchmark"]
+
   scraper:
     build: .
     command: ["python", "prf_scraper.py", "2024", "2025", "2026"]

@@ -1,4 +1,5 @@
 data/
+sample-data/
 .venv/
 __pycache__/
 *.py[cod]
