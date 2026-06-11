@@ -242,104 +242,190 @@
       </section>
 
       <section class="section parallelism presentation-slide" id="paralelismo" data-title="Paralelismo">
-        <div class="section-heading compact">
-          <div>
-            <span class="section-index">03 / PARALELISMO</span>
-            <h2>Dividir por ano reduz o tempo de carga.</h2>
+        <div class="concept-heading">
+          <div class="concept-number">03</div>
+          <div class="concept-title">
+            <span class="section-index">PARALELISMO / PROCESSPOOL</span>
+            <h2>Três anos.<br /><em>Três frentes de trabalho.</em></h2>
           </div>
           <p>
-            Aqui está o motivo central do projeto: os dados de cada ano podem
-            ser processados ao mesmo tempo, em vez de esperar um ano terminar
-            para começar o próximo.
+            O coordenador não processa tudo sozinho. Ele separa o conjunto por
+            ano e entrega cada parte a um processo independente.
           </p>
         </div>
 
-        <div class="parallel-layout">
-          <article class="parallel-card emphasize">
-            <span class="panel-kicker">Modelo adotado</span>
-            <h3>Mestre-trabalhador</h3>
-            <p>
-              Um coordenador distribui os anos e vários workers executam a
-              mesma tarefa em paralelo. Cada worker lida com um subconjunto
-              independente do problema.
-            </p>
-            <ul class="bullet-list">
-              <li>1 worker = execução sequencial, linha de base</li>
-              <li>2 workers = dois anos ao mesmo tempo</li>
-              <li>3 workers = três anos ao mesmo tempo</li>
-            </ul>
-          </article>
+        <div class="parallel-stage">
+          <div class="worker-story">
+            <div class="coordinator-node">
+              <span class="node-index">00</span>
+              <div>
+                <small>Processo principal</small>
+                <strong>Coordenador</strong>
+                <p>Descobre os arquivos e distribui as tarefas.</p>
+              </div>
+              <span class="dispatch-badge">dispatch()</span>
+            </div>
 
-          <div class="parallel-grid">
-            <article>
-              <span>Por que funciona</span>
-              <h3>Os anos são independentes</h3>
-              <p>2024, 2025 e 2026 têm conjuntos separados de registros.</p>
-            </article>
-            <article>
-              <span>O que melhora</span>
-              <h3>Tempo total de ingestão</h3>
-              <p>Enquanto um worker lê um ano, outro já prepara o próximo.</p>
-            </article>
-            <article>
-              <span>Limite prático</span>
-              <h3>Ganho não é linear</h3>
-              <p>CPU, disco e PostgreSQL continuam sendo recursos compartilhados.</p>
-            </article>
-            <article>
-              <span>Resultado medido</span>
-              <h3>Speedup de 1,873</h3>
-              <p>Com três workers, o tempo médio caiu de 24,135 s para 12,886 s.</p>
-            </article>
+            <div class="worker-branches" aria-label="Distribuição dos anos entre workers">
+              <article class="worker-node worker-one">
+                <span class="worker-dot"></span>
+                <small>Worker 01</small>
+                <strong>2024</strong>
+                <p>Lê, normaliza e carrega seu conjunto.</p>
+                <div class="worker-progress"><i></i></div>
+              </article>
+              <article class="worker-node worker-two">
+                <span class="worker-dot"></span>
+                <small>Worker 02</small>
+                <strong>2025</strong>
+                <p>Executa em paralelo, com conexão própria.</p>
+                <div class="worker-progress"><i></i></div>
+              </article>
+              <article class="worker-node worker-three">
+                <span class="worker-dot"></span>
+                <small>Worker 03</small>
+                <strong>2026</strong>
+                <p>Processa sem esperar os anos anteriores.</p>
+                <div class="worker-progress"><i></i></div>
+              </article>
+            </div>
+
+            <div class="database-target">
+              <span class="database-icon"><i></i><i></i><i></i></span>
+              <div>
+                <small>Destino compartilhado</small>
+                <strong>PostgreSQL</strong>
+              </div>
+              <p>Cada worker usa sua própria transação.</p>
+            </div>
           </div>
+
+          <aside class="benchmark-panel">
+            <div class="benchmark-topline">
+              <span>Benchmark real</span>
+              <strong>2.007.544 linhas</strong>
+            </div>
+            <h3>Mais vazão,<br />menos espera.</h3>
+
+            <div class="benchmark-bars">
+              <div class="benchmark-row">
+                <div><strong>1</strong><span>worker</span></div>
+                <div class="benchmark-track"><i style="--bar: 100%"></i></div>
+                <span>24,135 s</span>
+              </div>
+              <div class="benchmark-row">
+                <div><strong>2</strong><span>workers</span></div>
+                <div class="benchmark-track"><i style="--bar: 71.6%"></i></div>
+                <span>17,274 s</span>
+              </div>
+              <div class="benchmark-row best">
+                <div><strong>3</strong><span>workers</span></div>
+                <div class="benchmark-track"><i style="--bar: 53.4%"></i></div>
+                <span>12,886 s</span>
+              </div>
+            </div>
+
+            <div class="benchmark-result">
+              <div><strong>46,6%</strong><span>menos tempo</span></div>
+              <div><strong>1,873×</strong><span>speedup</span></div>
+              <div><strong>156 mil</strong><span>linhas/s</span></div>
+            </div>
+            <p class="benchmark-note">
+              O ganho não é linear: CPU, disco, índices e banco continuam
+              compartilhados entre os processos.
+            </p>
+          </aside>
         </div>
       </section>
 
       <section class="section containers presentation-slide" id="containers" data-title="Containers">
-        <div class="section-heading compact">
-          <div>
-            <span class="section-index">04 / CONTAINERIZAÇÃO</span>
-            <h2>Cada parte da solução vive em seu próprio container.</h2>
+        <div class="concept-heading container-heading">
+          <div class="concept-number">04</div>
+          <div class="concept-title">
+            <span class="section-index">CONTAINERIZAÇÃO / DOCKER COMPOSE</span>
+            <h2>Uma aplicação.<br /><em>Oito serviços isolados.</em></h2>
           </div>
           <p>
-            Isso evita instalação manual, facilita a apresentação e mantém o
-            projeto reproduzível em qualquer máquina com Docker.
+            Cada componente leva suas dependências, expõe apenas o necessário
+            e se comunica pela rede interna criada pelo Compose.
           </p>
         </div>
 
-        <div class="container-grid">
-          <article class="container-card">
-            <span>Frontend</span>
-            <h3>Interface do usuário</h3>
-            <p>Entrega a página e encaminha chamadas para a API via Nginx.</p>
-          </article>
-          <article class="container-card">
-            <span>API</span>
-            <h3>Camada de consulta</h3>
-            <p>Recebe requisições HTTP e consulta o PostgreSQL.</p>
-          </article>
-          <article class="container-card">
-            <span>Banco</span>
-            <h3>Persistência</h3>
-            <p>Armazena ocorrências, pessoas, causas e histórico de cargas.</p>
-          </article>
-          <article class="container-card">
-            <span>Monitoramento</span>
-            <h3>Prometheus e Grafana</h3>
-            <p>Coletam e exibem métricas de desempenho e saúde do sistema.</p>
-          </article>
-        </div>
-
-        <div class="benefit-band">
-          <div>
-            <span class="panel-kicker">Vantagens práticas</span>
-            <h3>Por que usar containers?</h3>
+        <div class="compose-shell">
+          <div class="compose-toolbar">
+            <div>
+              <i></i><i></i><i></i>
+              <span>rota-network</span>
+            </div>
+            <code>docker compose up -d</code>
+            <span class="compose-health"><i></i> 8 serviços ativos</span>
           </div>
-          <div class="benefit-list">
-            <span>Ambiente igual para todos</span>
-            <span>Menos conflito de dependências</span>
-            <span>Execução com um comando</span>
-            <span>Serviços separados e organizados</span>
+
+          <div class="architecture-map">
+            <div class="architecture-lane experience-lane">
+              <span class="lane-label">Experiência</span>
+              <article class="service-node frontend-node">
+                <span class="service-port">:3001</span>
+                <div class="service-node-icon">N</div>
+                <div><small>Entrada pública</small><strong>Frontend</strong><p>HTML, CSS e Nginx</p></div>
+              </article>
+              <article class="service-node dashboard-node">
+                <span class="service-port">:8501</span>
+                <div class="service-node-icon">S</div>
+                <div><small>Análise avançada</small><strong>Dashboard</strong><p>Streamlit e Plotly</p></div>
+              </article>
+            </div>
+
+            <div class="architecture-flow">
+              <span>HTTP</span>
+              <i></i>
+              <span>SQL</span>
+            </div>
+
+            <div class="architecture-lane core-lane">
+              <span class="lane-label">Núcleo da aplicação</span>
+              <article class="service-node api-node">
+                <span class="service-port">:8000</span>
+                <div class="service-node-icon">{ }</div>
+                <div><small>Camada de consulta</small><strong>FastAPI</strong><p>Agrega e entrega os dados</p></div>
+              </article>
+              <article class="service-node db-node">
+                <span class="service-port">:5432</span>
+                <div class="service-node-icon">DB</div>
+                <div><small>Fonte de verdade</small><strong>PostgreSQL</strong><p>Dados e histórico de cargas</p></div>
+              </article>
+            </div>
+
+            <div class="architecture-flow metrics-flow">
+              <span>métricas</span>
+              <i></i>
+              <span>painéis</span>
+            </div>
+
+            <div class="architecture-lane observe-lane">
+              <span class="lane-label">Observabilidade</span>
+              <article class="service-node prometheus-node">
+                <span class="service-port">:9090</span>
+                <div class="service-node-icon">P</div>
+                <div><small>Coleta</small><strong>Prometheus</strong><p>Séries temporais</p></div>
+              </article>
+              <article class="service-node grafana-node">
+                <span class="service-port">:3000</span>
+                <div class="service-node-icon">G</div>
+                <div><small>Visualização</small><strong>Grafana</strong><p>Painéis e alertas</p></div>
+              </article>
+              <div class="support-services">
+                <span>cAdvisor</span>
+                <span>Postgres exporter</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="container-outcomes">
+            <article><span>01</span><strong>Reproduzível</strong><p>O mesmo ambiente em qualquer máquina com Docker.</p></article>
+            <article><span>02</span><strong>Isolado</strong><p>Dependências de um serviço não quebram os demais.</p></article>
+            <article><span>03</span><strong>Observável</strong><p>Saúde e consumo ficam visíveis em tempo real.</p></article>
+            <article><span>04</span><strong>Operável</strong><p>Toda a stack inicia com um único comando.</p></article>
           </div>
         </div>
       </section>
