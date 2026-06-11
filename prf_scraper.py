@@ -135,6 +135,25 @@ def discover_datasets(html: str, year: int) -> dict[str, str]:
     return datasets
 
 
+def discover_available_years(html: str) -> list[int]:
+    parser = _TableRowParser()
+    parser.feed(html)
+    datasets_by_year: dict[int, set[str]] = {}
+    for row_text, links in parser.rows:
+        match = re.search(r"documento csv de acidentes\s+(\d{4})", _normalize(row_text))
+        if not match or not _preferred_download_link(links):
+            continue
+        year = int(match.group(1))
+        kind = _dataset_kind(row_text, year)
+        if kind:
+            datasets_by_year.setdefault(year, set()).add(kind)
+    return sorted(
+        year
+        for year, kinds in datasets_by_year.items()
+        if kinds == set(DATASET_FILENAMES)
+    )
+
+
 def fetch_source_page(url: str = PRF_DATA_URL) -> str:
     response = requests.get(
         url,
@@ -219,13 +238,16 @@ def download_year(
     return extracted
 
 
-def run(years: Iterable[int]) -> list[Path]:
+def run(
+    years: Iterable[int],
+    output_root: Path | None = None,
+) -> list[Path]:
     html = fetch_source_page()
     downloaded: list[Path] = []
-    output_root = Path(__file__).resolve().parent / "data"
+    destination = output_root or Path(__file__).resolve().parent / "data"
     for year in years:
         datasets = discover_datasets(html, year)
-        downloaded.extend(download_year(year, datasets, output_root))
+        downloaded.extend(download_year(year, datasets, destination))
     return downloaded
 
 

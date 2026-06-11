@@ -2,6 +2,7 @@ const state = {
   year: "",
   years: [],
   summary: null,
+  importPolling: null,
 };
 
 const number = new Intl.NumberFormat("pt-BR");
@@ -20,6 +21,19 @@ async function api(path, params = {}) {
   const response = await fetch(`${path}${query.size ? `?${query}` : ""}`);
   if (!response.ok) throw new Error(`API respondeu ${response.status}`);
   return response.json();
+}
+
+async function apiPost(path, body) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.detail || `API respondeu ${response.status}`);
+  }
+  return payload;
 }
 
 function setServiceLinks() {
@@ -134,14 +148,14 @@ function renderYears(years) {
     <button class="active" data-year="">Todos os anos</button>
     ${state.years.map((year) => `<button data-year="${year}">${year}</button>`).join("")}
   `;
-  container.addEventListener("click", async (event) => {
+  container.onclick = async (event) => {
     const button = event.target.closest("button");
     if (!button || button.classList.contains("active")) return;
     container.querySelectorAll("button").forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
     state.year = button.dataset.year;
     await refreshAnalysis();
-  });
+  };
 }
 
 function linePath(points) {
@@ -301,6 +315,96 @@ function renderLoads(data) {
     .join("");
 }
 
+function renderImportYears(years) {
+  const container = $("#import-year-options");
+  container.innerHTML = years
+    .map((item) => `
+      <label class="import-year-option">
+        <input type="checkbox" name="import-year" value="${item.ano}" />
+        <span>${item.ano}${item.carregado ? "<small>carregado</small>" : ""}</span>
+      </label>
+    `)
+    .join("");
+}
+
+function setImportBusy(busy) {
+  $("#import-button").disabled = busy;
+  document.querySelectorAll('input[name="import-year"]').forEach((input) => {
+    input.disabled = busy;
+  });
+}
+
+function renderImportStatus(status) {
+  const element = $("#import-status");
+  element.className = "import-status";
+  element.textContent = status.erro || status.mensagem;
+  if (status.estado === "erro") element.classList.add("error");
+  if (status.estado === "concluido") element.classList.add("success");
+  setImportBusy(["baixando", "carregando"].includes(status.estado));
+}
+
+async function refreshAfterImport() {
+  const [years, loads, importYears] = await Promise.all([
+    api("/api/por-ano"),
+    api("/api/cargas"),
+    api("/api/dados/anos"),
+  ]);
+  renderYears(years);
+  renderLoads(loads);
+  renderImportYears(importYears);
+  state.year = "";
+  await refreshAnalysis();
+}
+
+async function pollImportStatus() {
+  window.clearTimeout(state.importPolling);
+  try {
+    const status = await api("/api/dados/importacao");
+    renderImportStatus(status);
+    if (["baixando", "carregando"].includes(status.estado)) {
+      state.importPolling = window.setTimeout(pollImportStatus, 1500);
+    } else if (status.estado === "concluido") {
+      await refreshAfterImport();
+    }
+  } catch (error) {
+    $("#import-status").className = "import-status error";
+    $("#import-status").textContent = "Não foi possível consultar a importação.";
+    setImportBusy(false);
+  }
+}
+
+async function initDataImport() {
+  const [years, status] = await Promise.all([
+    api("/api/dados/anos"),
+    api("/api/dados/importacao"),
+  ]);
+  renderImportYears(years);
+  renderImportStatus(status);
+  $("#data-import-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const selected = [
+      ...document.querySelectorAll('input[name="import-year"]:checked'),
+    ].map((input) => Number(input.value));
+    if (!selected.length) {
+      $("#import-status").className = "import-status error";
+      $("#import-status").textContent = "Selecione pelo menos um ano.";
+      return;
+    }
+    try {
+      const result = await apiPost("/api/dados/importar", { anos: selected });
+      renderImportStatus(result);
+      await pollImportStatus();
+    } catch (error) {
+      $("#import-status").className = "import-status error";
+      $("#import-status").textContent = error.message;
+      setImportBusy(false);
+    }
+  });
+  if (["baixando", "carregando"].includes(status.estado)) {
+    await pollImportStatus();
+  }
+}
+
 function showAnalysisError() {
   ["#monthly-chart", "#causes-chart", "#states-list"].forEach((selector) => {
     $(selector).innerHTML = '<div class="error-state">Não foi possível consultar a API.</div>';
@@ -344,6 +448,14 @@ async function start() {
     console.error(error);
     showAnalysisError();
     $("#load-table").innerHTML = '<div class="error-state">Histórico indisponível.</div>';
+  }
+  try {
+    await initDataImport();
+  } catch (error) {
+    console.error(error);
+    $("#import-year-options").innerHTML =
+      '<span class="import-status error">Anos indisponíveis.</span>';
+    $("#import-button").disabled = true;
   }
 }
 

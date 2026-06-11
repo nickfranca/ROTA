@@ -227,7 +227,19 @@ docker compose run --rm \
 
 ## Baixar ou atualizar os dados
 
-O scraper é opcional. Use-o quando precisar buscar novamente os arquivos:
+Na página inicial, a área **Atualização da base** permite selecionar um ou
+mais anos publicados pela PRF. Ao confirmar, a aplicação:
+
+1. baixa os três CSVs de cada ano;
+2. salva os arquivos em `data/<ano>/`;
+3. substitui os registros desses anos no PostgreSQL;
+4. atualiza os indicadores e gráficos quando a carga termina.
+
+A importação roda em segundo plano e apenas uma operação pode ser executada
+por vez. Anos marcados como `carregado` podem ser selecionados novamente para
+atualização.
+
+O scraper também pode ser executado pelo terminal:
 
 ```bash
 docker compose --profile scrape run --rm scraper
@@ -239,7 +251,11 @@ Para selecionar anos diferentes:
 docker compose run --rm scraper python prf_scraper.py 2023 2024 2025
 ```
 
-Depois do download, execute o loader novamente.
+Nesse fluxo manual, execute o loader depois do download:
+
+```bash
+docker compose --profile load run --rm loader
+```
 
 ## Operação cotidiana
 

@@ -1364,6 +1364,106 @@ a {
   color: #858c9d;
 }
 
+.data-import-panel {
+  margin-top: 16px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  display: grid;
+  grid-template-columns: minmax(250px, .8fr) minmax(360px, 1.2fr);
+  gap: 28px;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(20,24,39,.96), rgba(13,16,27,.96));
+}
+
+.data-import-panel h3 {
+  margin: 7px 0;
+  font-size: 1.08rem;
+}
+
+.data-import-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.6;
+}
+
+.import-year-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.import-year-option {
+  position: relative;
+}
+
+.import-year-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.import-year-option span {
+  min-width: 72px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  display: inline-flex;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .68rem;
+  transition: 160ms ease;
+}
+
+.import-year-option small {
+  color: #67d9e8;
+  font-size: .52rem;
+}
+
+.import-year-option input:checked + span {
+  border-color: rgba(181,171,255,.45);
+  color: white;
+  background: rgba(139,124,255,.2);
+}
+
+.import-year-option input:disabled + span {
+  cursor: wait;
+  opacity: .55;
+}
+
+.import-actions {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.import-actions .button {
+  border: 0;
+}
+
+.import-actions .button:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+
+.import-status,
+.import-loading {
+  color: var(--subtle);
+  font-size: .65rem;
+}
+
+.import-status.error {
+  color: #ff8b85;
+}
+
+.import-status.success {
+  color: #67d9e8;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2156,6 +2256,10 @@ footer {
 }
 
 @media (max-width: 1100px) {
+  .data-import-panel {
+    grid-template-columns: 1fr;
+  }
+
   .hero {
     grid-template-columns: 1fr;
     padding-top: 80px;
@@ -2268,6 +2372,15 @@ footer {
 }
 
 @media (max-width: 760px) {
+  .import-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .import-actions .button {
+    justify-content: center;
+  }
+
   .topbar,
   .section,
   .trust-strip,

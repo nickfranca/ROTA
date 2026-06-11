@@ -211,6 +211,30 @@
           </span>
         </div>
 
+        <div class="data-import-panel">
+          <div>
+            <span class="panel-kicker">Atualização da base</span>
+            <h3>Baixar e carregar novos anos</h3>
+            <p>
+              Selecione os anos publicados pela PRF. A aplicação baixa os CSVs
+              e atualiza o PostgreSQL sem reiniciar os containers.
+            </p>
+          </div>
+          <form id="data-import-form">
+            <div class="import-year-options" id="import-year-options">
+              <span class="import-loading">Consultando anos disponíveis...</span>
+            </div>
+            <div class="import-actions">
+              <button class="button button-primary" id="import-button" type="submit">
+                Baixar e carregar
+              </button>
+              <span class="import-status" id="import-status">
+                Nenhuma importação em andamento.
+              </span>
+            </div>
+          </form>
+        </div>
+
         <div class="metric-grid">
           <article class="metric-card featured">
             <span class="metric-label">Acidentes registrados</span>

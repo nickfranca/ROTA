@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from time import perf_counter
 
-from fastapi import FastAPI, Query, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, Histogram, make_asgi_app
+from pydantic import BaseModel, Field
 
+from app.config import DATA_ROOT
+from app.data_import import DataImportManager, ImportAlreadyRunningError
 from app.db import close_pool, fetch_all, fetch_one, open_pool
+from prf_scraper import discover_available_years, fetch_source_page
 
 
 REQUESTS = Counter(
@@ -20,6 +25,11 @@ LATENCY = Histogram(
     "Duracao das requisicoes HTTP",
     ["method", "path"],
 )
+DATA_IMPORT = DataImportManager(Path(DATA_ROOT))
+
+
+class DataImportRequest(BaseModel):
+    anos: list[int] = Field(min_length=1)
 
 
 @asynccontextmanager
@@ -37,7 +47,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 app.mount("/metrics", make_asgi_app())
@@ -198,3 +208,40 @@ def cargas():
         LIMIT 30
         """
     )
+
+
+@app.get("/api/dados/anos")
+def dados_anos():
+    available = set(discover_available_years(fetch_source_page()))
+    loaded = {
+        int(item["ano"])
+        for item in fetch_all(
+            "SELECT DISTINCT ano_fonte AS ano FROM ocorrencias ORDER BY ano_fonte"
+        )
+    }
+    return DATA_IMPORT.list_years(available, loaded)
+
+
+@app.post("/api/dados/importar", status_code=status.HTTP_202_ACCEPTED)
+def importar_dados(payload: DataImportRequest, tasks: BackgroundTasks):
+    available = set(discover_available_years(fetch_source_page()))
+    invalid = sorted(set(payload.anos) - available)
+    if invalid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Anos indisponíveis: {', '.join(map(str, invalid))}",
+        )
+    try:
+        result = DATA_IMPORT.start(payload.anos)
+    except ImportAlreadyRunningError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+    tasks.add_task(DATA_IMPORT.run)
+    return result
+
+
+@app.get("/api/dados/importacao")
+def status_importacao():
+    return DATA_IMPORT.status()
