@@ -4,11 +4,13 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from prf_scraper import (
     InvalidArchiveError,
     discover_available_years,
     discover_datasets,
+    download_year,
     extract_single_csv,
 )
 
@@ -73,6 +75,39 @@ class ScraperTest(unittest.TestCase):
 
             with self.assertRaises(InvalidArchiveError):
                 extract_single_csv(archive, root / "output.csv")
+
+    @patch("prf_scraper.extract_single_csv")
+    @patch("prf_scraper.download_drive_file")
+    def test_reports_each_downloaded_dataset(
+        self,
+        download_mock,
+        extract_mock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            updates: list[tuple[int, str]] = []
+            datasets = {
+                "ocorrencias": "https://drive.google.com/a",
+                "pessoas": "https://drive.google.com/b",
+                "pessoas_todas_causas": "https://drive.google.com/c",
+            }
+
+            download_year(
+                2025,
+                datasets,
+                Path(temporary),
+                progress=lambda year, kind: updates.append((year, kind)),
+            )
+
+        self.assertEqual(
+            updates,
+            [
+                (2025, "ocorrencias"),
+                (2025, "pessoas"),
+                (2025, "pessoas_todas_causas"),
+            ],
+        )
+        self.assertEqual(download_mock.call_count, 3)
+        self.assertEqual(extract_mock.call_count, 3)
 
 
 if __name__ == "__main__":

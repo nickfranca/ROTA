@@ -32,6 +32,39 @@ class DataImportManagerTest(unittest.TestCase):
         with self.assertRaises(ImportAlreadyRunningError):
             manager.start([2025])
 
+    def test_reports_progress_from_download_through_database_load(self) -> None:
+        manager = DataImportManager(Path("/data"))
+        started = manager.start([2024, 2025])
+
+        self.assertEqual(started["progresso"], 0)
+        self.assertEqual(started["concluidos"], 0)
+        self.assertEqual(started["total"], 7)
+
+        observed: list[dict] = []
+
+        def download(years, output_root, progress) -> None:
+            completed = 0
+            for year in years:
+                for kind in (
+                    "ocorrencias",
+                    "pessoas",
+                    "pessoas_todas_causas",
+                ):
+                    completed += 1
+                    progress(year, kind, completed)
+                    observed.append(manager.status())
+
+        def load(_: list[Path]) -> None:
+            observed.append(manager.status())
+
+        manager.run(download=download, load=load)
+
+        self.assertEqual(observed[0]["progresso"], 14)
+        self.assertEqual(observed[-1]["estado"], "carregando")
+        self.assertEqual(observed[-1]["progresso"], 86)
+        self.assertEqual(manager.status()["progresso"], 100)
+        self.assertEqual(manager.status()["concluidos"], 7)
+
     def test_downloads_before_loading_selected_years(self) -> None:
         events: list[tuple] = []
         with tempfile.TemporaryDirectory() as temporary:
@@ -39,7 +72,7 @@ class DataImportManagerTest(unittest.TestCase):
             manager = DataImportManager(root)
             manager.start([2024, 2025])
 
-            def download(years: list[int], output_root: Path) -> None:
+            def download(years: list[int], output_root: Path, _) -> None:
                 events.append(("download", years, output_root))
                 for year in years:
                     (output_root / str(year)).mkdir(parents=True)
@@ -64,7 +97,7 @@ class DataImportManagerTest(unittest.TestCase):
         manager = DataImportManager(Path("/data"))
         manager.start([2024])
 
-        def fail_download(_: list[int], __: Path) -> None:
+        def fail_download(_: list[int], __: Path, ___) -> None:
             raise RuntimeError("falha simulada")
 
         manager.run(download=fail_download, load=lambda _: None)

@@ -122,14 +122,15 @@ senha: admin
 ## Como os dados chegam à tela
 
 1. O scraper baixa os arquivos publicados pela PRF.
-2. O loader lê os CSVs em blocos de 25 mil linhas.
-3. O processo coordenador distribui anos diferentes entre os workers.
-4. Cada worker normaliza os valores e usa sua própria transação PostgreSQL.
-5. Os dados são inseridos com `COPY`.
-6. A API executa consultas agregadas no banco.
-7. O frontend chama a API e monta indicadores e gráficos.
-8. Prometheus coleta métricas da API, do banco e dos containers.
-9. Grafana transforma essas métricas em painéis de desempenho.
+2. Durante a atualização pelo frontend, a barra avança a cada CSV concluído.
+3. O loader lê os CSVs em blocos de 25 mil linhas.
+4. O processo coordenador distribui anos diferentes entre os workers.
+5. Cada worker normaliza os valores e usa sua própria transação PostgreSQL.
+6. Os dados são inseridos com `COPY`.
+7. A API executa consultas agregadas no banco.
+8. O frontend chama a API e monta indicadores e gráficos.
+9. Prometheus coleta métricas da API, do banco e dos containers.
+10. Grafana transforma essas métricas em painéis de desempenho.
 
 O frontend não lê os CSVs e não acessa o banco diretamente:
 

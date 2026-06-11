@@ -336,10 +336,16 @@ function setImportBusy(busy) {
 
 function renderImportStatus(status) {
   const element = $("#import-status");
+  const progress = Math.max(0, Math.min(100, Number(status.progresso || 0)));
+  const progressElement = $("#import-progress");
   element.className = "import-status";
   element.textContent = status.erro || status.mensagem;
   if (status.estado === "erro") element.classList.add("error");
   if (status.estado === "concluido") element.classList.add("success");
+  progressElement.hidden = status.estado === "ocioso";
+  progressElement.setAttribute("aria-valuenow", String(progress));
+  $("#import-progress-bar").style.width = `${progress}%`;
+  $("#import-progress-label").textContent = `${progress}%`;
   setImportBusy(["baixando", "carregando"].includes(status.estado));
 }
 

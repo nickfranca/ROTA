@@ -8,7 +8,7 @@ import unicodedata
 import zipfile
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 import requests
 
@@ -23,6 +23,8 @@ DATASET_FILENAMES = {
     "pessoas_todas_causas": "pessoas_todas_causas.csv",
 }
 REQUEST_TIMEOUT = (15, 60)
+DatasetProgress = Callable[[int, str], None]
+DownloadProgress = Callable[[int, str, int], None]
 
 
 class ScraperError(RuntimeError):
@@ -219,6 +221,7 @@ def download_year(
     year: int,
     datasets: dict[str, str],
     output_root: Path,
+    progress: DatasetProgress | None = None,
 ) -> list[Path]:
     year_directory = output_root / str(year)
     year_directory.mkdir(parents=True, exist_ok=True)
@@ -233,6 +236,8 @@ def download_year(
             destination = year_directory / filename
             extract_single_csv(archive, destination)
             extracted.append(destination)
+            if progress:
+                progress(year, kind)
             print(f"[{year}] Salvo em {destination}")
 
     return extracted
@@ -241,13 +246,29 @@ def download_year(
 def run(
     years: Iterable[int],
     output_root: Path | None = None,
+    progress: DownloadProgress | None = None,
 ) -> list[Path]:
     html = fetch_source_page()
     downloaded: list[Path] = []
     destination = output_root or Path(__file__).resolve().parent / "data"
+    completed = 0
+
+    def report_progress(year: int, kind: str) -> None:
+        nonlocal completed
+        completed += 1
+        if progress:
+            progress(year, kind, completed)
+
     for year in years:
         datasets = discover_datasets(html, year)
-        downloaded.extend(download_year(year, datasets, destination))
+        downloaded.extend(
+            download_year(
+                year,
+                datasets,
+                destination,
+                progress=report_progress,
+            )
+        )
     return downloaded
 
 

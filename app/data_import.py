@@ -5,10 +5,11 @@ from threading import Lock
 from typing import Callable
 
 from app.loader import load_dataset
-from prf_scraper import run as download_years
+from prf_scraper import DATASET_FILENAMES, run as download_years
 
 
-DownloadFunction = Callable[[list[int], Path], object]
+ProgressFunction = Callable[[int, str, int], None]
+DownloadFunction = Callable[[list[int], Path, ProgressFunction], object]
 LoadFunction = Callable[[list[Path]], object]
 
 
@@ -26,6 +27,10 @@ class DataImportManager:
             "etapa": None,
             "mensagem": "Nenhuma importação em andamento.",
             "erro": None,
+            "progresso": 0,
+            "concluidos": 0,
+            "total": 0,
+            "item_atual": None,
         }
 
     @staticmethod
@@ -44,6 +49,7 @@ class DataImportManager:
 
     def start(self, years: list[int]) -> dict:
         selected = sorted(set(years))
+        total = len(selected) * len(DATASET_FILENAMES) + 1
         with self._lock:
             if self._status["estado"] in {"baixando", "carregando"}:
                 raise ImportAlreadyRunningError(
@@ -55,6 +61,10 @@ class DataImportManager:
                 "etapa": "download",
                 "mensagem": "Baixando os arquivos selecionados.",
                 "erro": None,
+                "progresso": 0,
+                "concluidos": 0,
+                "total": total,
+                "item_atual": None,
             }
             return dict(self._status)
 
@@ -71,12 +81,30 @@ class DataImportManager:
         load_selected = load or (
             lambda paths: load_dataset(paths, workers=1)
         )
+        download_units = len(years) * len(DATASET_FILENAMES)
+        total = download_units + 1
+
+        def report_progress(year: int, kind: str, completed: int) -> None:
+            completed = min(completed, download_units)
+            self._update(
+                progresso=round(completed / total * 100),
+                concluidos=completed,
+                item_atual=f"{year} · {DATASET_FILENAMES[kind]}",
+                mensagem=(
+                    f"Baixando arquivos: {completed} de "
+                    f"{download_units} concluídos."
+                ),
+            )
+
         try:
-            download(years, self.data_root)
+            download(years, self.data_root, report_progress)
             self._update(
                 estado="carregando",
                 etapa="carga",
                 mensagem="Carregando os dados no PostgreSQL.",
+                progresso=round(download_units / total * 100),
+                concluidos=download_units,
+                item_atual="PostgreSQL",
             )
             year_dirs = [self.data_root / str(year) for year in years]
             load_selected(year_dirs)
@@ -84,6 +112,9 @@ class DataImportManager:
                 estado="concluido",
                 etapa=None,
                 mensagem="Download e carga concluídos.",
+                progresso=100,
+                concluidos=total,
+                item_atual=None,
             )
         except Exception as error:
             self._update(
@@ -91,4 +122,5 @@ class DataImportManager:
                 etapa=None,
                 mensagem="A importação não foi concluída.",
                 erro=str(error),
+                item_atual=None,
             )
