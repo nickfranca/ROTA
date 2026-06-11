@@ -553,7 +553,7 @@ Foram implementados seis testes:
 Comando:
 
 ```bash
-docker compose --profile load run --rm loader \
+docker compose --profile load run --rm --build loader \
   python -m unittest discover -v
 ```
 
@@ -690,7 +690,7 @@ docker compose --profile benchmark run --rm benchmark
 Executar testes:
 
 ```bash
-docker compose --profile load run --rm loader \
+docker compose --profile load run --rm --build loader \
   python -m unittest discover -v
 ```
 

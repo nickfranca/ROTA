@@ -374,7 +374,8 @@ docker compose config --quiet
 Executar testes automatizados:
 
 ```bash
-docker compose --profile load run --rm loader python -m unittest discover -v
+docker compose --profile load run --rm --build \
+  loader python -m unittest discover -v
 ```
 
 Executar o benchmark reproduzível:

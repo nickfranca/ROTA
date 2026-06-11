@@ -196,7 +196,8 @@ Relatórios:
 Executar os testes no mesmo ambiente da aplicação:
 
 ```bash
-docker compose --profile load run --rm loader python -m unittest discover -v
+docker compose --profile load run --rm --build \
+  loader python -m unittest discover -v
 ```
 
 Os testes cobrem normalização do ETL, descoberta dos anos, cálculo de speedup,
