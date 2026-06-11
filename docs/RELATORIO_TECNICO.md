@@ -4,7 +4,7 @@
 
 **Disciplina:** Sistemas Paralelos e Distribuídos  
 **Tema:** Tema 7 - Aplicação com Computação em Nuvem ou Contêineres  
-**Integrantes:** preencher com os nomes do grupo  
+**Integrantes:** Nicole França e Davi Teixeira
 **Data:** 11 de junho de 2026
 
 ## 1. Descrição do problema
@@ -22,7 +22,7 @@ sequencialmente ou distribuída entre múltiplos workers.
 Os dados de acidentes ajudam a identificar estados, períodos e causas com maior
 quantidade de ocorrências, feridos e mortes. Uma aplicação consultável facilita
 a exploração dessas informações e demonstra um uso concreto de sistemas
-distribuídos em engenharia de dados.
+paralelos e distribuídos.
 
 ## 3. Dados de entrada
 
